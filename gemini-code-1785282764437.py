@@ -2,17 +2,23 @@ import streamlit as st
 import openpyxl
 import io
 import re
+import gc
 from datetime import datetime
 
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
 st.title("📝 Form Pengisian Data Catin")
-st.write("Silakan isi formulir di bawah ini. Sekali isi, seluruh sheet formulir (N1, N2, N4, N5, N6, Wali, dsb) akan otomatis terisi!")
+st.write("Silakan isi formulir di bawah ini. Sekali isi, seluruh sheet formulir (N1, N2, N4, N5, N6, RDS, dll.) akan otomatis terisi!")
 
-# File Excel master yang sudah ada rumus link-nya
 EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
 
-# Fungsi untuk menghitung umur otomatis dari teks TTL
+# Fungsi membaca master excel ke memori buffer agar aman dari Error 500
+@st.cache_resource(show_spinner=False)
+def load_master_bytes():
+    with open(EXCEL_MASTER, "rb") as f:
+        return f.read()
+
+# Fungsi untuk menghitung umur otomatis
 def hitung_umur(ttl_text):
     if not ttl_text:
         return ""
@@ -28,10 +34,16 @@ def hitung_umur(ttl_text):
 def validasi_nik(nik, label):
     nik_str = str(nik).strip()
     if not nik_str.isdigit():
-        return f"❌ {label} harus berupa angka saja (tidak boleh ada huruf/simbol)!"
+        return f"❌ {label} harus berupa angka saja!"
     if len(nik_str) != 16:
         return f"❌ {label} harus tepat 16 digit! (Saat ini: {len(nik_str)} digit)"
     return None
+
+try:
+    master_bytes = load_master_bytes()
+except Exception as e:
+    st.error(f"⚠️ Gagal membaca file master Excel '{EXCEL_MASTER}'. Pastikan file sudah ter-upload di GitHub. Error: {e}")
+    st.stop()
 
 with st.form("catin_form"):
     # -------------------------------------------------------------
@@ -132,7 +144,6 @@ with st.form("catin_form"):
     submitted = st.form_submit_button("💾 Proses Data & Buat File Excel")
 
 if submitted:
-    # Validasi NIK
     daftar_nik = [
         (pria_nik, "NIK Catin Laki-Laki"),
         (ayah_pria_nik, "NIK Ayah Laki-Laki"),
@@ -155,119 +166,118 @@ if submitted:
         for err in errors:
             st.error(err)
     else:
-        # Load workbook master
-        wb = openpyxl.load_workbook(EXCEL_MASTER)
-        ws = wb["ISIAN DATA"]
+        try:
+            # Memuat workbook dari buffer memori (sangat cepat & hemat RAM)
+            wb = openpyxl.load_workbook(io.BytesIO(master_bytes))
+            ws = wb["ISIAN DATA"]
 
-        # 1. Surat & Pelaksanaan
-        ws["G2"] = no_register
-        ws["H3"] = f", {tgl_surat}"
-        ws["G4"] = str(tgl_pelaksanaan)
-        ws["G5"] = jam_pelaksanaan
-        ws["G6"] = tempat_akad
+            # 1. Surat & Pelaksanaan
+            ws["G2"] = no_register
+            ws["H3"] = f", {tgl_surat}"
+            ws["G4"] = str(tgl_pelaksanaan)
+            ws["G5"] = jam_pelaksanaan
+            ws["G6"] = tempat_akad
 
-        # 2. Catin Laki-Laki
-        ws["G8"] = pria_nama
-        ws["G9"] = pria_bin
-        ws["G10"] = pria_ttl
-        ws["J10"] = "UMUR"
-        ws["K10"] = hitung_umur(pria_ttl)
-        ws["G11"] = str(pria_nik)
-        ws["G12"] = pria_pekerjaan
-        ws["G13"] = pria_status
-        ws["G16"] = pria_alamat
-        ws["G17"] = pria_pendidikan
+            # 2. Catin Laki-Laki
+            ws["G8"] = pria_nama
+            ws["G9"] = pria_bin
+            ws["G10"] = pria_ttl
+            ws["K10"] = hitung_umur(pria_ttl)
+            ws["G11"] = str(pria_nik)
+            ws["G12"] = pria_pekerjaan
+            ws["G13"] = pria_status
+            ws["G16"] = pria_alamat
+            ws["G17"] = pria_pendidikan
 
-        # Ayah & Ibu Laki-Laki
-        ws["G19"] = ayah_pria_nama
-        ws["J19"] = ayah_pria_bin
-        ws["G20"] = str(ayah_pria_nik)
-        ws["G21"] = ayah_pria_ttl
-        ws["J21"] = "UMUR"
-        ws["K21"] = hitung_umur(ayah_pria_ttl)
-        ws["G22"] = ayah_pria_pekerjaan
-        ws["G23"] = ayah_pria_alamat
+            # Ayah & Ibu Laki-Laki
+            ws["G19"] = ayah_pria_nama
+            ws["J19"] = ayah_pria_bin
+            ws["G20"] = str(ayah_pria_nik)
+            ws["G21"] = ayah_pria_ttl
+            ws["K21"] = hitung_umur(ayah_pria_ttl)
+            ws["G22"] = ayah_pria_pekerjaan
+            ws["G23"] = ayah_pria_alamat
 
-        ws["G26"] = ibu_pria_nama
-        ws["I26"] = ibu_pria_bin
-        ws["G27"] = str(ibu_pria_nik)
-        ws["G28"] = ibu_pria_ttl
-        ws["J28"] = "UMUR"
-        ws["K28"] = hitung_umur(ibu_pria_ttl)
-        ws["G29"] = ibu_pria_pekerjaan
-        ws["G30"] = ibu_pria_alamat
+            ws["G26"] = ibu_pria_nama
+            ws["I26"] = ibu_pria_bin
+            ws["G27"] = str(ibu_pria_nik)
+            ws["G28"] = ibu_pria_ttl
+            ws["K28"] = hitung_umur(ibu_pria_ttl)
+            ws["G29"] = ibu_pria_pekerjaan
+            ws["G30"] = ibu_pria_alamat
 
-        # 3. Catin Perempuan
-        ws["G34"] = wanita_nama
-        ws["G35"] = wanita_binti
-        ws["G36"] = wanita_ttl
-        ws["J36"] = "UMUR"
-        ws["K36"] = hitung_umur(wanita_ttl)
-        ws["G37"] = str(wanita_nik)
-        ws["G38"] = wanita_pekerjaan
-        ws["G39"] = wanita_status
-        ws["G41"] = wanita_alamat
-        ws["G43"] = wanita_pendidikan
+            # 3. Catin Perempuan
+            ws["G34"] = wanita_nama
+            ws["G35"] = wanita_binti
+            ws["G36"] = wanita_ttl
+            ws["K36"] = hitung_umur(wanita_ttl)
+            ws["G37"] = str(wanita_nik)
+            ws["G38"] = wanita_pekerjaan
+            ws["G39"] = wanita_status
+            ws["G41"] = wanita_alamat
+            ws["G43"] = wanita_pendidikan
 
-        # Ayah & Ibu Perempuan
-        ws["G45"] = ayah_wanita_nama
-        ws["I45"] = ayah_wanita_bin
-        ws["G46"] = str(ayah_wanita_nik)
-        ws["G47"] = ayah_wanita_ttl
-        ws["J47"] = "UMUR"
-        ws["K47"] = hitung_umur(ayah_wanita_ttl)
-        ws["G48"] = ayah_wanita_pekerjaan
-        ws["G49"] = ayah_wanita_alamat
+            # Ayah & Ibu Perempuan
+            ws["G45"] = ayah_wanita_nama
+            ws["I45"] = ayah_wanita_bin
+            ws["G46"] = str(ayah_wanita_nik)
+            ws["G47"] = ayah_wanita_ttl
+            ws["K47"] = hitung_umur(ayah_wanita_ttl)
+            ws["G48"] = ayah_wanita_pekerjaan
+            ws["G49"] = ayah_wanita_alamat
 
-        ws["G52"] = ibu_wanita_nama
-        ws["I52"] = ibu_wanita_bin
-        ws["G53"] = str(ibu_wanita_nik)
-        ws["G54"] = ibu_wanita_ttl
-        ws["J54"] = "UMUR"
-        ws["K54"] = hitung_umur(ibu_wanita_ttl)
-        ws["G55"] = ibu_wanita_pekerjaan
-        ws["G56"] = ibu_wanita_alamat
+            ws["G52"] = ibu_wanita_nama
+            ws["I52"] = ibu_wanita_bin
+            ws["G53"] = str(ibu_wanita_nik)
+            ws["G54"] = ibu_wanita_ttl
+            ws["K54"] = hitung_umur(ibu_wanita_ttl)
+            ws["G55"] = ibu_wanita_pekerjaan
+            ws["G56"] = ibu_wanita_alamat
 
-        # 4. Wali & Mahar
-        ws["G58"] = wali_nama
-        ws["G59"] = wali_bin
-        ws["G60"] = str(wali_nik)
-        ws["G61"] = wali_ttl
-        ws["J61"] = "UMUR"
-        ws["K61"] = hitung_umur(wali_ttl)
-        ws["G62"] = wali_pekerjaan
-        ws["G63"] = wali_alamat
-        ws["G64"] = wali_hubungan
-        ws["G65"] = mahar
-        ws["G68"] = nama_lengkap_wali_b68
+            # 4. Wali & Mahar
+            ws["G58"] = wali_nama
+            ws["G59"] = wali_bin
+            ws["G60"] = str(wali_nik)
+            ws["G61"] = wali_ttl
+            ws["K61"] = hitung_umur(wali_ttl)
+            ws["G62"] = wali_pekerjaan
+            ws["G63"] = wali_alamat
+            ws["G64"] = wali_hubungan
+            ws["G65"] = mahar
+            ws["G68"] = nama_lengkap_wali_b68
 
-        # 5. Saksi 1
-        ws["G70"] = saksi1_nama
-        ws["G71"] = saksi1_ttl
-        ws["J71"] = "UMUR"
-        ws["K71"] = hitung_umur(saksi1_ttl)
-        ws["G72"] = str(saksi1_nik)
-        ws["G73"] = saksi1_pekerjaan
-        ws["G74"] = saksi1_alamat
+            # 5. Saksi 1
+            ws["G70"] = saksi1_nama
+            ws["G71"] = saksi1_ttl
+            ws["K71"] = hitung_umur(saksi1_ttl)
+            ws["G72"] = str(saksi1_nik)
+            ws["G73"] = saksi1_pekerjaan
+            ws["G74"] = saksi1_alamat
 
-        # 6. Saksi 2
-        ws["G76"] = saksi2_nama
-        ws["G77"] = saksi2_ttl
-        ws["J77"] = "UMUR"
-        ws["K77"] = hitung_umur(saksi2_ttl)
-        ws["G78"] = str(saksi2_nik)
-        ws["G79"] = saksi2_pekerjaan
-        ws["G80"] = saksi2_alamat
+            # 6. Saksi 2
+            ws["G76"] = saksi2_nama
+            ws["G77"] = saksi2_ttl
+            ws["K77"] = hitung_umur(saksi2_ttl)
+            ws["G78"] = str(saksi2_nik)
+            ws["G79"] = saksi2_pekerjaan
+            ws["G80"] = saksi2_alamat
 
-        # Save ke buffer
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
+            # Simpan ke Stream Bytes (Memory)
+            buffer = io.BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
 
-        st.success("✅ Seluruh sheet formulir berhasil diupdate secara otomatis!")
-        st.download_button(
-            label="📥 Download File Excel Lengkap (All Sheets)",
-            data=buffer,
-            file_name=f"BERKAS_CATIN_{wanita_nama}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            st.success("✅ Seluruh sheet formulir berhasil diupdate secara otomatis!")
+            st.download_button(
+                label="📥 Download File Excel Lengkap (All Sheets)",
+                data=buffer,
+                file_name=f"BERKAS_CATIN_{wanita_nama}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+            # Bersihkan memori server
+            wb.close()
+            gc.collect()
+
+        except Exception as e:
+            st.error(f"❌ Terjadi kesalahan saat memproses file Excel: {e}")
