@@ -7,13 +7,15 @@ from datetime import datetime
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
 st.title("📝 Form Pengisian Data Catin")
-st.write("Silakan isi formulir di bawah ini. Umur dihitung otomatis dari Tempat Tanggal Lahir (TTL). NIK wajib 16 digit.")
+st.write("Silakan isi formulir di bawah ini. Sekali isi, seluruh sheet formulir (N1, N2, N4, N5, N6, Wali, dsb) akan otomatis terisi!")
 
-# Fungsi untuk menghitung umur otomatis dari teks TTL (Mencari tahun 4 digit)
+# File Excel master yang sudah ada rumus link-nya
+EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
+
+# Fungsi untuk menghitung umur otomatis dari teks TTL
 def hitung_umur(ttl_text):
     if not ttl_text:
         return ""
-    # Mencari 4 digit angka tahun (misal: 1997, 2008, dll)
     match = re.search(r'\b(19\d\d|20\d\d)\b', str(ttl_text))
     if match:
         tahun_lahir = int(match.group(1))
@@ -34,98 +36,98 @@ def validasi_nik(nik, label):
 with st.form("catin_form"):
     # -------------------------------------------------------------
     st.header("📌 1. Data Surat & Pelaksanaan")
-    no_register = st.text_input("Nomor Register", "400.12.3.2/006/ VII/ 2026")
-    tgl_surat = st.text_input("Tanggal Surat (Format: TAMBI, 27 JULI 2026)", "TAMBI, 27 JULI 2026")
+    no_register = st.text_input("Nomor Register", "400.12.3.2/007/ VII/ 2026")
+    tgl_surat = st.text_input("Tanggal Surat (Format: TAMBI, 29 JULI 2026)", "TAMBI, 29 JULI 2026")
     tgl_pelaksanaan = st.date_input("Tanggal Pelaksanaan Akad")
     jam_pelaksanaan = st.text_input("Jam Pelaksanaan", "JAM. 08.00")
-    tempat_akad = st.text_area("Tempat Akad Nikah", "DI RUMAH MEMPELAI PUTRI RT 002 RW 004 DESA TAMBI WATUKUMPUL PEMALANG")
+    tempat_akad = st.text_area("Tempat Akad Nikah", "DI RUMAH MEMPELAI PUTRI RT 010 RW 002 DESA TAMBI WATUKUMPUL PEMALANG")
 
     # -------------------------------------------------------------
     st.markdown("---")
     st.header("👨 2. Calon Pengantin Laki-Laki")
-    pria_nama = st.text_input("Nama Laki-Laki", "UNWAN FALAHI")
-    pria_bin = st.text_input("BIN (Ayah Laki-Laki)", "RATAM")
-    pria_ttl = st.text_input("Tempat Tanggal Lahir (Pria)", "PEMALANG, 23 JUNI 1997")
-    pria_nik = st.text_input("NIK (Pria) [Wajib 16 Digit]", "3327042306970003", max_chars=16)
-    pria_pekerjaan = st.text_input("Pekerjaan (Pria)", "BURUH HARIAN LEPAS")
+    pria_nama = st.text_input("Nama Laki-Laki", "SAEFULOH")
+    pria_bin = st.text_input("BIN (Ayah Laki-Laki)", "KUNENI")
+    pria_ttl = st.text_input("Tempat Tanggal Lahir (Pria)", "PURBALINGGA , 07 APRIL 2000")
+    pria_nik = st.text_input("NIK (Pria) [Wajib 16 Digit]", "3303170704000001", max_chars=16)
+    pria_pekerjaan = st.text_input("Pekerjaan (Pria)", "KARYAWAN SWASTA")
     pria_status = st.selectbox("Status (Pria)", ["BELUM KAWIN", "DUDA"], index=0)
-    pria_pendidikan = st.text_input("Pendidikan (Pria)", "SD")
-    pria_alamat = st.text_area("Alamat (Pria)", "RT 002 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    pria_pendidikan = st.text_input("Pendidikan (Pria)", "SLTA")
+    pria_alamat = st.text_area("Alamat (Pria)", "RT 004 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
 
     st.subheader("👴 Data Ayah Laki-Laki")
-    ayah_pria_nama = st.text_input("Nama Ayah Laki-Laki", "RATAM")
-    ayah_pria_bin = st.text_input("BIN Ayah Laki-Laki (Kakek)", "MURTAJA")
-    ayah_pria_nik = st.text_input("NIK Ayah Laki-Laki [Wajib 16 Digit]", "3327040308660001", max_chars=16)
-    ayah_pria_ttl = st.text_input("TTL Ayah Laki-Laki", "PEMALANG, 03 AGUSTUS 1966")
+    ayah_pria_nama = st.text_input("Nama Ayah Laki-Laki", "KUNENI")
+    ayah_pria_bin = st.text_input("BIN Ayah Laki-Laki (Kakek)", "SANBISRI")
+    ayah_pria_nik = st.text_input("NIK Ayah Laki-Laki [Wajib 16 Digit]", "3303170406740001", max_chars=16)
+    ayah_pria_ttl = st.text_input("TTL Ayah Laki-Laki", "PURBALINGGA, 04 JUNI 1974")
     ayah_pria_pekerjaan = st.text_input("Pekerjaan Ayah Laki-Laki", "PETANI/ PEKEBUN")
-    ayah_pria_alamat = st.text_area("Alamat Ayah Laki-Laki", "RT 002 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    ayah_pria_alamat = st.text_area("Alamat Ayah Laki-Laki", "RT 004 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
 
     st.subheader("👵 Data Ibu Laki-Laki")
-    ibu_pria_nama = st.text_input("Nama Ibu Laki-Laki", "DASRI")
-    ibu_pria_bin = st.text_input("BIN Ibu Laki-Laki", "KARTADIWIRYA")
-    ibu_pria_nik = st.text_input("NIK Ibu Laki-Laki [Wajib 16 Digit]", "3327045104690001", max_chars=16)
-    ibu_pria_ttl = st.text_input("TTL Ibu Laki-Laki", "PEMALANG, 11 APRIL 1969")
+    ibu_pria_nama = st.text_input("Nama Ibu Laki-Laki", "DARYATI")
+    ibu_pria_bin = st.text_input("BIN Ibu Laki-Laki", "SUMIARTO")
+    ibu_pria_nik = st.text_input("NIK Ibu Laki-Laki [Wajib 16 Digit]", "3303174705800003", max_chars=16)
+    ibu_pria_ttl = st.text_input("TTL Ibu Laki-Laki", "PURBALINGGA, 07 JUNI 1980")
     ibu_pria_pekerjaan = st.text_input("Pekerjaan Ibu Laki-Laki", "Mengurus Rumah Tangga")
-    ibu_pria_alamat = st.text_area("Alamat Ibu Laki-Laki", "RT 002 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    ibu_pria_alamat = st.text_area("Alamat Ibu Laki-Laki", "RT 004 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
 
     # -------------------------------------------------------------
     st.markdown("---")
     st.header("👩 3. Calon Pengantin Perempuan")
-    wanita_nama = st.text_input("Nama Perempuan", "IKNA SABELA")
-    wanita_binti = st.text_input("BINTI (Ayah Perempuan)", "WARYONO")
-    wanita_ttl = st.text_input("Tempat Tanggal Lahir (Perempuan)", "PEMALANG, 05 OKTOBER 2008")
-    wanita_nik = st.text_input("NIK (Perempuan) [Wajib 16 Digit]", "3327044510080002", max_chars=16)
+    wanita_nama = st.text_input("Nama Perempuan", "SUSILAH")
+    wanita_binti = st.text_input("BINTI (Ayah Perempuan)", "RUSMAN")
+    wanita_ttl = st.text_input("Tempat Tanggal Lahir (Perempuan)", "PEMALANG, 11 SEPTEMBER 1999")
+    wanita_nik = st.text_input("NIK (Perempuan) [Wajib 16 Digit]", "3327045109990007", max_chars=16)
     wanita_pekerjaan = st.text_input("Pekerjaan (Perempuan)", "BELUM/ TIDAK BEKERJA")
     wanita_status = st.selectbox("Status (Perempuan)", ["BELUM KAWIN", "JANDA"], index=0)
-    wanita_pendidikan = st.text_input("Pendidikan (Perempuan)", "SD")
-    wanita_alamat = st.text_area("Alamat (Perempuan)", "RT 003 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    wanita_pendidikan = st.text_input("Pendidikan (Perempuan)", "SLTA")
+    wanita_alamat = st.text_area("Alamat (Perempuan)", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
 
     st.subheader("👴 Data Ayah Perempuan")
-    ayah_wanita_nama = st.text_input("Nama Ayah Perempuan", "WARYONO")
-    ayah_wanita_bin = st.text_input("BIN Ayah Perempuan (Kakek)", "MURSIDI")
-    ayah_wanita_nik = st.text_input("NIK Ayah Perempuan [Wajib 16 Digit]", "3327041209810002", max_chars=16)
-    ayah_wanita_ttl = st.text_input("TTL Ayah Perempuan", "PEMALANG, 12 SEPTEMBER 1981")
+    ayah_wanita_nama = st.text_input("Nama Ayah Perempuan", "RUSMAN")
+    ayah_wanita_bin = st.text_input("BIN Ayah Perempuan (Kakek)", "MARTA")
+    ayah_wanita_nik = st.text_input("NIK Ayah Perempuan [Wajib 16 Digit]", "3327040107740063", max_chars=16)
+    ayah_wanita_ttl = st.text_input("TTL Ayah Perempuan", "PEMALANG, 01 JULI 1974")
     ayah_wanita_pekerjaan = st.text_input("Pekerjaan Ayah Perempuan", "PETANI/ PEKEBUN")
-    ayah_wanita_alamat = st.text_area("Alamat Ayah Perempuan", "RT 003 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    ayah_wanita_alamat = st.text_area("Alamat Ayah Perempuan", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
 
     st.subheader("👵 Data Ibu Perempuan")
-    ibu_wanita_nama = st.text_input("Nama Ibu Perempuan", "DEWI MURIYAH")
-    ibu_wanita_bin = st.text_input("BIN Ibu Perempuan", "SUWARNO")
-    ibu_wanita_nik = st.text_input("NIK Ibu Perempuan [Wajib 16 Digit]", "3327044302900010", max_chars=16)
-    ibu_wanita_ttl = st.text_input("TTL Ibu Perempuan", "PEMALANG 03 FEBRUARI 1990")
+    ibu_wanita_nama = st.text_input("Nama Ibu Perempuan", "KHOSINGAH")
+    ibu_wanita_bin = st.text_input("BIN Ibu Perempuan", "NASIR")
+    ibu_wanita_nik = st.text_input("NIK Ibu Perempuan [Wajib 16 Digit]", "3327044107810112", max_chars=16)
+    ibu_wanita_ttl = st.text_input("TTL Ibu Perempuan", "PEMALANG 01 JULI 1981")
     ibu_wanita_pekerjaan = st.text_input("Pekerjaan Ibu Perempuan", "Mengurus Rumah Tangga")
-    ibu_wanita_alamat = st.text_area("Alamat Ibu Perempuan", "RT 003 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    ibu_wanita_alamat = st.text_area("Alamat Ibu Perempuan", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
 
     # -------------------------------------------------------------
     st.markdown("---")
     st.header("🤝 4. Data Wali & Mahar")
-    wali_nama = st.text_input("Nama Wali", "WARYONO")
-    wali_bin = st.text_input("BIN Wali", "MURSIDI")
+    wali_nama = st.text_input("Nama Wali", "RUSMAN")
+    wali_bin = st.text_input("BIN Wali", "MARTA")
     wali_nik = st.text_input("NIK Wali [Wajib 16 Digit]", "3327040107740063", max_chars=16)
-    wali_ttl = st.text_input("TTL Wali", "PEMALANG, 12 SEPTEMBER 1999")
+    wali_ttl = st.text_input("TTL Wali", "PEMALANG, 01 JULI 1974")
     wali_pekerjaan = st.text_input("Pekerjaan Wali", "PETANI/ PEKEBUN")
-    wali_alamat = st.text_area("Alamat Wali", "RT 003 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    wali_alamat = st.text_area("Alamat Wali", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
     wali_hubungan = st.text_input("Hubungan Wali", "AYAH KANDUNG")
     mahar = st.text_input("Mahar / Maskawin", "Seperangkat Alat Sholat")
-    nama_lengkap_wali_b68 = st.text_input("Nama Wali Lengkap beserta BIN", "WARYONO BIN MURSIDI")
+    nama_lengkap_wali_b68 = st.text_input("Nama Wali Lengkap beserta BIN", "RUSMAN BIN MARTA")
 
     # -------------------------------------------------------------
     st.markdown("---")
     st.header("📜 5. Data Saksi-Saksi")
     
     st.subheader("👤 Saksi 1")
-    saksi1_nama = st.text_input("Nama Saksi 1", "WARTIM")
-    saksi1_ttl = st.text_input("Tempat, Tanggal Lahir Saksi 1", "PEMALANG 16 MEI 1987")
-    saksi1_nik = st.text_input("NIK Saksi 1 [Wajib 16 Digit]", "3327041605870003", max_chars=16)
-    saksi1_pekerjaan = st.text_input("Pekerjaan Saksi 1", "WIRASWASTA")
-    saksi1_alamat = st.text_area("Alamat Saksi 1", "RT 003 RW 001 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    saksi1_nama = st.text_input("Nama Saksi 1", "JURI")
+    saksi1_ttl = st.text_input("Tempat, Tanggal Lahir Saksi 1", "PEMALANG, 04 MEI 1966")
+    saksi1_nik = st.text_input("NIK Saksi 1 [Wajib 16 Digit]", "3327040405660002", max_chars=16)
+    saksi1_pekerjaan = st.text_input("Pekerjaan Saksi 1", "KEPALA DESA")
+    saksi1_alamat = st.text_area("Alamat Saksi 1", "RT 010 RW 002 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
 
     st.subheader("👤 Saksi 2")
-    saksi2_nama = st.text_input("Nama Saksi 2", "CHALIM MUCHTAROM")
-    saksi2_ttl = st.text_input("Tempat, Tanggal Lahir Saksi 2", "PEMALANG, 21 OKTOBER 1989")
-    saksi2_nik = st.text_input("NIK Saksi 2 [Wajib 16 Digit]", "3327042110890004", max_chars=16)
-    saksi2_pekerjaan = st.text_input("Pekerjaan Saksi 2", "PERANGKAT DESA")
-    saksi2_alamat = st.text_area("Alamat Saksi 2", "RT 002 RW 001 DESA TAMBI KEC. WATUKUMPUL KAB. PEMALANG")
+    saksi2_nama = st.text_input("Nama Saksi 2", "GHOFUR")
+    saksi2_ttl = st.text_input("Tempat, Tanggal Lahir Saksi 2", "PURBALINGGA, 10 FEBRUARI 1988")
+    saksi2_nik = st.text_input("NIK Saksi 2 [Wajib 16 Digit]", "3303171002880003", max_chars=16)
+    saksi2_pekerjaan = st.text_input("Pekerjaan Saksi 2", "WIRASWASTA")
+    saksi2_alamat = st.text_area("Alamat Saksi 2", "RT 001 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
 
     submitted = st.form_submit_button("💾 Proses Data & Buat File Excel")
 
@@ -153,7 +155,8 @@ if submitted:
         for err in errors:
             st.error(err)
     else:
-        wb = openpyxl.load_workbook("ISIAN DATA CATIN.xlsx")
+        # Load workbook master
+        wb = openpyxl.load_workbook(EXCEL_MASTER)
         ws = wb["ISIAN DATA"]
 
         # 1. Surat & Pelaksanaan
@@ -261,10 +264,10 @@ if submitted:
         wb.save(buffer)
         buffer.seek(0)
 
-        st.success("✅ Data dan Umur berhasil diproses secara otomatis!")
+        st.success("✅ Seluruh sheet formulir berhasil diupdate secara otomatis!")
         st.download_button(
-            label="📥 Download File Excel Terisi",
+            label="📥 Download File Excel Lengkap (All Sheets)",
             data=buffer,
-            file_name=f"ISIAN_DATA_CATIN_{pria_nama}.xlsx",
+            file_name=f"BERKAS_CATIN_{wanita_nama}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
