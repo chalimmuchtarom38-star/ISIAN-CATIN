@@ -17,7 +17,7 @@ except Exception:
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
 st.title("📝 Form Pengisian Data Catin")
-st.write("Isi formulir di bawah ini. Download **Excel Utuh (Master 100%)** atau **PDF Isian Data (Full 1 Halaman F4 Lengkap)**.")
+st.write("Isi formulir di bawah ini. Download **Excel Utuh (Master 100%)** atau **PDF Isian Data (Full Halaman F4)**.")
 
 EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
 
@@ -66,15 +66,17 @@ def generate_pdf_isian_data(data_dict, tgl_surat_val):
     
     try:
         buffer = io.BytesIO()
-        f4_size = (612, 936) # Ukuran F4 dalam point
+        # Ukuran F4 dalam point: 612 x 936
+        f4_size = (612, 936) 
         
+        # Margin atas/bawah diperkecil (10pt) agar pemanfaatan kertas penuh sampai bawah
         doc = SimpleDocTemplate(
             buffer,
             pagesize=f4_size,
-            rightMargin=20,
-            leftMargin=20,
-            topMargin=15,
-            bottomMargin=15
+            rightMargin=18,
+            leftMargin=18,
+            topMargin=10,
+            bottomMargin=10
         )
         
         styles = getSampleStyleSheet()
@@ -84,7 +86,7 @@ def generate_pdf_isian_data(data_dict, tgl_surat_val):
             parent=styles['Heading1'],
             fontSize=11,
             alignment=1,
-            spaceAfter=3,
+            spaceAfter=4,
             fontName='Helvetica-Bold',
             textColor=colors.HexColor("#1A365D")
         )
@@ -92,30 +94,31 @@ def generate_pdf_isian_data(data_dict, tgl_surat_val):
         section_style = ParagraphStyle(
             'SectionStyle',
             parent=styles['Heading2'],
-            fontSize=7.8,
+            fontSize=8,
             fontName='Helvetica-Bold',
             textColor=colors.HexColor("#1A365D"),
             spaceBefore=0,
             spaceAfter=0
         )
         
-        cell_label_style = ParagraphStyle('CellLabel', fontSize=7.0, fontName='Helvetica-Bold', leading=8.0, textColor=colors.HexColor("#2D3748"))
-        cell_val_style = ParagraphStyle('CellVal', fontSize=7.0, fontName='Helvetica', leading=8.0, textColor=colors.HexColor("#1A202C"))
+        cell_label_style = ParagraphStyle('CellLabel', fontSize=7.2, fontName='Helvetica-Bold', leading=8.5, textColor=colors.HexColor("#2D3748"))
+        cell_val_style = ParagraphStyle('CellVal', fontSize=7.2, fontName='Helvetica', leading=8.5, textColor=colors.HexColor("#1A202C"))
         
-        ttd_text_style = ParagraphStyle('TTDText', fontSize=8, fontName='Helvetica', alignment=1, leading=9.5)
-        ttd_nama_style = ParagraphStyle('TTDNama', fontSize=8.5, fontName='Helvetica-Bold', alignment=1, leading=9.5)
+        ttd_text_style = ParagraphStyle('TTDText', fontSize=8.5, fontName='Helvetica', alignment=1, leading=10)
+        ttd_nama_style = ParagraphStyle('TTDNama', fontSize=9, fontName='Helvetica-Bold', alignment=1, leading=10)
 
         story = []
         story.append(Paragraph("<b>LEMBAR ISIAN DATA CATIN & PELAKSANAAN AKAD</b>", title_style))
 
         table_data = []
+        # Padding dinaikkan sedikit (1.8) agar tinggi tabel mengisi ruang vertikal dengan pas
         t_style = [
             ('BACKGROUND', (0,0), (-1,-1), colors.white),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 0.8),
-            ('TOPPADDING', (0,0), (-1,-1), 0.8),
-            ('LEFTPADDING', (0,0), (-1,-1), 4),
-            ('RIGHTPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 1.8),
+            ('TOPPADDING', (0,0), (-1,-1), 1.8),
+            ('LEFTPADDING', (0,0), (-1,-1), 5),
+            ('RIGHTPADDING', (0,0), (-1,-1), 5),
             ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#CBD5E0")),
         ]
 
@@ -133,25 +136,27 @@ def generate_pdf_isian_data(data_dict, tgl_surat_val):
                 table_data.append([p_k, p_v])
                 row_idx += 1
 
-        t = Table(table_data, colWidths=[145, 427])
+        t = Table(table_data, colWidths=[150, 426])
         t.setStyle(TableStyle(t_style))
         story.append(t)
         
-        story.append(Spacer(1, 10))
+        # Pendorong tabel TTD lebih ke bawah
+        story.append(Spacer(1, 20))
         
         # Format Tanggal TTD
         tgl_clean = tgl_surat_val.upper().replace('TAMBI,', '').strip()
         if not tgl_clean:
             tgl_clean = datetime.now().strftime("%d %B %Y")
             
+        # Blok Tanda Tangan
         ttd_data = [
             ["", Paragraph(f"Tambi, {tgl_clean}", ttd_text_style)],
             ["", Paragraph("Pengantar / Kasi Pelayanan", ttd_text_style)],
-            ["", Spacer(1, 30)], 
+            ["", Spacer(1, 50)], # Ruang TTD diperlebar agar posisi persis berada di bawah kertas
             ["", Paragraph("<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>", ttd_nama_style)]
         ]
         
-        ttd_table = Table(ttd_data, colWidths=[340, 232])
+        ttd_table = Table(ttd_data, colWidths=[340, 236])
         ttd_table.setStyle(TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('ALIGN', (1,0), (1,-1), 'CENTER'),
@@ -307,7 +312,7 @@ if submitted:
             
             hari_akad = get_nama_hari(tgl_pelaksanaan)
 
-            # Master Excel 100% Tetap Sesuai Aslinya
+            # Master Excel 100% Utuh & Aman
             ws["G2"] = no_register
             ws["H3"] = f", {tgl_surat}"
             ws["G4"] = str(tgl_pelaksanaan)
