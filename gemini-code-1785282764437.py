@@ -8,11 +8,11 @@ from datetime import datetime
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
 st.title("📝 Form Pengisian Data Catin")
-st.write("Silakan isi formulir di bawah ini. Sekali isi, seluruh sheet formulir (N1, N2, N4, N5, N6, RDS, dll.) akan otomatis terisi!")
+st.write("Silakan isi formulir di bawah ini. File Excel yang di-download **otomatis tersetting ukuran kertas F4/Folio** untuk seluruh sheet!")
 
 EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
 
-# Fungsi membaca master excel ke memori buffer agar aman dari Error 500
+# Fungsi membaca master excel ke memori buffer agar hemat RAM
 @st.cache_resource(show_spinner=False)
 def load_master_bytes():
     with open(EXCEL_MASTER, "rb") as f:
@@ -167,7 +167,6 @@ if submitted:
             st.error(err)
     else:
         try:
-            # Memuat workbook dari buffer memori (sangat cepat & hemat RAM)
             wb = openpyxl.load_workbook(io.BytesIO(master_bytes))
             ws = wb["ISIAN DATA"]
 
@@ -262,20 +261,25 @@ if submitted:
             ws["G79"] = saksi2_pekerjaan
             ws["G80"] = saksi2_alamat
 
+            # --- ATUR UKURAN KERTAS MENJADI F4 / FOLIO UNTUK SEMUA SHEET ---
+            for sheetname in wb.sheetnames:
+                ws_sheet = wb[sheetname]
+                ws_sheet.page_setup.paperSize = 14  # 14 = Kertas Folio / F4 (8.5 x 13 in)
+                ws_sheet.page_setup.orientation = ws_sheet.ORIENTATION_PORTRAIT
+
             # Simpan ke Stream Bytes (Memory)
             buffer = io.BytesIO()
             wb.save(buffer)
             buffer.seek(0)
 
-            st.success("✅ Seluruh sheet formulir berhasil diupdate secara otomatis!")
+            st.success("✅ Seluruh sheet berhasil diisi & ukuran kertas otomatis ter-set ke F4 / Folio!")
             st.download_button(
-                label="📥 Download File Excel Lengkap (All Sheets)",
+                label="📥 Download File Excel (Ukuran F4)",
                 data=buffer,
                 file_name=f"BERKAS_CATIN_{wanita_nama}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-            # Bersihkan memori server
             wb.close()
             gc.collect()
 
