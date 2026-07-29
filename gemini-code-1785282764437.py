@@ -5,11 +5,11 @@ import re
 import gc
 from datetime import datetime
 
-# Impor reportlab untuk pembuatan PDF
+# Impor reportlab secara aman
 HAS_REPORTLAB = True
 try:
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 except ImportError:
     HAS_REPORTLAB = False
@@ -17,7 +17,7 @@ except ImportError:
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
 st.title("📝 Form Pengisian Data Catin")
-st.write("Isi formulir di bawah ini. Anda dapat mendownload file **Excel Utuh (Master 100%)** atau **PDF Isian Data (1 Lembar F4)**.")
+st.write("Isi formulir di bawah ini. Anda dapat mendownload file **Excel Utuh (Master 100%)** atau **PDF Isian Data (1 Lembar F4 Lengkap)**.")
 
 EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
 
@@ -51,15 +51,14 @@ def generate_pdf_isian_data(data_dict):
     
     buffer = io.BytesIO()
     
-    # Ukuran Kertas F4 dalam Point (1 inci = 72 pt) -> 215.9mm x 330mm = 612pt x 936pt
+    # Ukuran Kertas F4 dalam Point (215.9mm x 330mm = 612pt x 936pt)
     f4_size = (612, 936)
     
-    # Margin super hemat ruang agar pas 1 lembar F4
     doc = SimpleDocTemplate(
         buffer,
         pagesize=f4_size,
-        rightMargin=20,
-        leftMargin=20,
+        rightMargin=22,
+        leftMargin=22,
         topMargin=20,
         bottomMargin=20
     )
@@ -69,45 +68,45 @@ def generate_pdf_isian_data(data_dict):
     title_style = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=12,
+        fontSize=11,
         alignment=1, # Center
-        spaceAfter=6,
-        fontName='Helvetica-Bold'
+        spaceAfter=5,
+        fontName='Helvetica-Bold',
+        textColor=colors.HexColor("#1A365D")
     )
     section_style = ParagraphStyle(
         'SectionStyle',
         parent=styles['Heading2'],
-        fontSize=8.5,
+        fontSize=8,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor("#1A365D"),
         spaceBefore=0,
         spaceAfter=0
     )
-    cell_label_style = ParagraphStyle('CellLabel', fontSize=7.5, fontName='Helvetica-Bold', leading=9)
-    cell_val_style = ParagraphStyle('CellVal', fontSize=7.5, fontName='Helvetica', leading=9)
+    cell_label_style = ParagraphStyle('CellLabel', fontSize=7.2, fontName='Helvetica-Bold', leading=8.8, textColor=colors.HexColor("#2D3748"))
+    cell_val_style = ParagraphStyle('CellVal', fontSize=7.2, fontName='Helvetica', leading=8.8, textColor=colors.HexColor("#1A202C"))
 
     story = []
-    story.append(Paragraph("<b>LEMBAR ISIAN DATA CATIN</b>", title_style))
+    story.append(Paragraph("<b>LEMBAR ISIAN DATA CATIN & PELAKSANAAN AKAD</b>", title_style))
 
     table_data = []
     t_style = [
         ('BACKGROUND', (0,0), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
-        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.2),
+        ('TOPPADDING', (0,0), (-1,-1), 1.2),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#A0AEC0")),
+        ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#CBD5E0")),
     ]
 
     row_idx = 0
     for section, fields in data_dict.items():
-        # Baris Header Seksi
+        # Header Seksi
         sec_p = Paragraph(f"<b>{section.upper()}</b>", section_style)
         table_data.append([sec_p, ""])
-        
         t_style.append(('SPAN', (0, row_idx), (1, row_idx)))
-        t_style.append(('BACKGROUND', (0, row_idx), (1, row_idx), colors.HexColor("#EDF2F7")))
+        t_style.append(('BACKGROUND', (0, row_idx), (1, row_idx), colors.HexColor("#E2E8F0")))
         row_idx += 1
         
         # Baris Data
@@ -117,8 +116,7 @@ def generate_pdf_isian_data(data_dict):
             table_data.append([p_k, p_v])
             row_idx += 1
 
-    # Lebar total tabel = 612 - 40 = 572 pt
-    t = Table(table_data, colWidths=[172, 400])
+    t = Table(table_data, colWidths=[150, 418])
     t.setStyle(TableStyle(t_style))
     story.append(t)
     
@@ -353,36 +351,59 @@ if submitted:
                 
             with col2:
                 if HAS_REPORTLAB:
+                    # Seluruh kolom dimasukkan tanpa ada yang dibuang
                     pdf_data = {
-                        "Surat & Pelaksanaan Akad": {
-                            "No Register": no_register, "Tanggal Surat": tgl_surat,
-                            "Tanggal / Jam Akad": f"{tgl_pelaksanaan} ({jam_pelaksanaan})", "Tempat Akad": tempat_akad
+                        "1. Surat & Pelaksanaan Akad": {
+                            "No Register": no_register,
+                            "Tanggal Surat": tgl_surat,
+                            "Tanggal Pelaksanaan Akad": str(tgl_pelaksanaan),
+                            "Jam Pelaksanaan": jam_pelaksanaan,
+                            "Tempat Akad Nikah": tempat_akad
                         },
-                        "Calon Pengantin Laki-Laki": {
-                            "Nama / NIK Pria": f"{pria_nama} bin {pria_bin} / NIK: {pria_nik}",
-                            "TTL / Pekerjaan / Status": f"{pria_ttl} / {pria_pekerjaan} / {pria_status}",
-                            "Alamat Pria": pria_alamat
+                        "2. Calon Pengantin Laki-Laki": {
+                            "Nama Laki-Laki": pria_nama,
+                            "BIN (Ayah Laki-Laki)": pria_bin,
+                            "TTL (Pria)": pria_ttl,
+                            "NIK (Pria)": pria_nik,
+                            "Pekerjaan (Pria)": pria_pekerjaan,
+                            "Status / Pendidikan": f"{pria_status} / {pria_pendidikan}",
+                            "Alamat (Pria)": pria_alamat
                         },
-                        "Orang Tua Pria": {
-                            "Ayah Pria": f"{ayah_pria_nama} bin {ayah_pria_bin} (NIK: {ayah_pria_nik})",
-                            "Ibu Pria": f"{ibu_pria_nama} binti {ibu_pria_bin} (NIK: {ibu_pria_nik})"
+                        "Orang Tua Laki-Laki": {
+                            "Ayah Laki-Laki": f"{ayah_pria_nama} bin {ayah_pria_bin} (NIK: {ayah_pria_nik} | TTL: {ayah_pria_ttl})",
+                            "Pekerjaan / Alamat Ayah": f"{ayah_pria_pekerjaan} - {ayah_pria_alamat}",
+                            "Ibu Laki-Laki": f"{ibu_pria_nama} binti {ibu_pria_bin} (NIK: {ibu_pria_nik} | TTL: {ibu_pria_ttl})",
+                            "Pekerjaan / Alamat Ibu": f"{ibu_pria_pekerjaan} - {ibu_pria_alamat}"
                         },
-                        "Calon Pengantin Perempuan": {
-                            "Nama / NIK Wanita": f"{wanita_nama} binti {wanita_binti} / NIK: {wanita_nik}",
-                            "TTL / Pekerjaan / Status": f"{wanita_ttl} / {wanita_pekerjaan} / {wanita_status}",
-                            "Alamat Wanita": wanita_alamat
+                        "3. Calon Pengantin Perempuan": {
+                            "Nama Perempuan": wanita_nama,
+                            "BINTI (Ayah Perempuan)": wanita_binti,
+                            "TTL (Perempuan)": wanita_ttl,
+                            "NIK (Perempuan)": wanita_nik,
+                            "Pekerjaan (Perempuan)": wanita_pekerjaan,
+                            "Status / Pendidikan": f"{wanita_status} / {wanita_pendidikan}",
+                            "Alamat (Perempuan)": wanita_alamat
                         },
-                        "Orang Tua Wanita": {
-                            "Ayah Wanita": f"{ayah_wanita_nama} bin {ayah_wanita_bin} (NIK: {ayah_wanita_nik})",
-                            "Ibu Wanita": f"{ibu_wanita_nama} binti {ibu_wanita_bin} (NIK: {ibu_wanita_nik})"
+                        "Orang Tua Perempuan": {
+                            "Ayah Perempuan": f"{ayah_wanita_nama} bin {ayah_wanita_bin} (NIK: {ayah_wanita_nik} | TTL: {ayah_wanita_ttl})",
+                            "Pekerjaan / Alamat Ayah": f"{ayah_wanita_pekerjaan} - {ayah_wanita_alamat}",
+                            "Ibu Perempuan": f"{ibu_wanita_nama} binti {ibu_wanita_bin} (NIK: {ibu_wanita_nik} | TTL: {ibu_wanita_ttl})",
+                            "Pekerjaan / Alamat Ibu": f"{ibu_wanita_pekerjaan} - {ibu_wanita_alamat}"
                         },
-                        "Wali & Mahar": {
-                            "Nama Wali / Hubungan": f"{wali_nama} bin {wali_bin} (NIK: {wali_nik}) - {wali_hubungan}",
-                            "Mahar / Maskawin": mahar
+                        "4. Wali & Mahar": {
+                            "Nama Wali / BIN": f"{wali_nama} bin {wali_bin} (Lengkap: {nama_lengkap_wali_b68})",
+                            "NIK / TTL Wali": f"{wali_nik} / {wali_ttl}",
+                            "Pekerjaan / Hubungan": f"{wali_pekerjaan} / {wali_hubungan}",
+                            "Alamat Wali": wali_alamat,
+                            "Mahar": mahar
                         },
-                        "Saksi-Saksi": {
-                            "Saksi 1": f"{saksi1_nama} (NIK: {saksi1_nik}) - {saksi1_pekerjaan}",
-                            "Saksi 2": f"{saksi2_nama} (NIK: {saksi2_nik}) - {saksi2_pekerjaan}"
+                        "5. Saksi-Saksi Nikah": {
+                            "Saksi 1 (Nama / NIK)": f"{saksi1_nama} (NIK: {saksi1_nik})",
+                            "TTL / Pekerjaan Saksi 1": f"{saksi1_ttl} / {saksi1_pekerjaan}",
+                            "Alamat Saksi 1": saksi1_alamat,
+                            "Saksi 2 (Nama / NIK)": f"{saksi2_nama} (NIK: {saksi2_nik})",
+                            "TTL / Pekerjaan Saksi 2": f"{saksi2_ttl} / {saksi2_pekerjaan}",
+                            "Alamat Saksi 2": saksi2_alamat
                         }
                     }
                     pdf_buffer = generate_pdf_isian_data(pdf_data)
