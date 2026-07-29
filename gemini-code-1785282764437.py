@@ -17,7 +17,7 @@ except ImportError:
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
 st.title("📝 Form Pengisian Data Catin")
-st.write("Isi formulir di bawah ini. Anda dapat mendownload file **Excel Utuh (Master 100%)** atau **PDF Isian Data (1 Lembar F4 Lengkap)**.")
+st.write("Isi formulir di bawah ini. Anda dapat mendownload file **Excel Utuh (Master 100%)** atau **PDF Isian Data (Full 1 Halaman F4)**.")
 
 EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
 
@@ -59,32 +59,37 @@ def generate_pdf_isian_data(data_dict):
         pagesize=f4_size,
         rightMargin=22,
         leftMargin=22,
-        topMargin=20,
-        bottomMargin=20
+        topMargin=22,
+        bottomMargin=22
     )
     
     styles = getSampleStyleSheet()
     
+    # Judul Dokumen
     title_style = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=11,
+        fontSize=12,
         alignment=1, # Center
-        spaceAfter=5,
+        spaceAfter=8,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor("#1A365D")
     )
+    
+    # Judul Sub-Seksi
     section_style = ParagraphStyle(
         'SectionStyle',
         parent=styles['Heading2'],
-        fontSize=8,
+        fontSize=8.5,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor("#1A365D"),
         spaceBefore=0,
         spaceAfter=0
     )
-    cell_label_style = ParagraphStyle('CellLabel', fontSize=7.2, fontName='Helvetica-Bold', leading=8.8, textColor=colors.HexColor("#2D3748"))
-    cell_val_style = ParagraphStyle('CellVal', fontSize=7.2, fontName='Helvetica', leading=8.8, textColor=colors.HexColor("#1A202C"))
+    
+    # Text dalam Sel (Ditingkatkan ukurannya agar pas mengisi halaman)
+    cell_label_style = ParagraphStyle('CellLabel', fontSize=8, fontName='Helvetica-Bold', leading=10, textColor=colors.HexColor("#2D3748"))
+    cell_val_style = ParagraphStyle('CellVal', fontSize=8, fontName='Helvetica', leading=10, textColor=colors.HexColor("#1A202C"))
 
     story = []
     story.append(Paragraph("<b>LEMBAR ISIAN DATA CATIN & PELAKSANAAN AKAD</b>", title_style))
@@ -93,11 +98,11 @@ def generate_pdf_isian_data(data_dict):
     t_style = [
         ('BACKGROUND', (0,0), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1.2),
-        ('TOPPADDING', (0,0), (-1,-1), 1.2),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
-        ('RIGHTPADDING', (0,0), (-1,-1), 4),
-        ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#CBD5E0")),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5), # Padding ditingkatkan agar tinggi tabel full 1 halaman
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 5),
+        ('RIGHTPADDING', (0,0), (-1,-1), 5),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E0")),
     ]
 
     row_idx = 0
@@ -116,7 +121,7 @@ def generate_pdf_isian_data(data_dict):
             table_data.append([p_k, p_v])
             row_idx += 1
 
-    t = Table(table_data, colWidths=[150, 418])
+    t = Table(table_data, colWidths=[155, 413])
     t.setStyle(TableStyle(t_style))
     story.append(t)
     
@@ -351,7 +356,6 @@ if submitted:
                 
             with col2:
                 if HAS_REPORTLAB:
-                    # Seluruh kolom dimasukkan tanpa ada yang dibuang
                     pdf_data = {
                         "1. Surat & Pelaksanaan Akad": {
                             "No Register": no_register,
@@ -408,7 +412,7 @@ if submitted:
                     }
                     pdf_buffer = generate_pdf_isian_data(pdf_data)
                     st.download_button(
-                        label="📄 Download PDF (1 Lembar F4)",
+                        label="📄 Download PDF (1 Halaman Full F4)",
                         data=pdf_buffer,
                         file_name=f"ISIAN_DATA_{wanita_nama}.pdf",
                         mime="application/pdf",
