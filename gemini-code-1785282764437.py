@@ -9,7 +9,7 @@ from datetime import datetime
 HAS_REPORTLAB = True
 try:
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 except ImportError:
     HAS_REPORTLAB = False
@@ -60,13 +60,13 @@ def validasi_nik(nik, label):
         return f"❌ {label} harus tepat 16 digit! (Saat ini: {len(nik_str)} digit)"
     return None
 
-def generate_pdf_isian_data(data_dict):
+def generate_pdf_isian_data(data_dict, tgl_surat_val):
     if not HAS_REPORTLAB:
         return None
     
     buffer = io.BytesIO()
     
-    # Ukuran Kertas F4 dalam Point (215.9mm x 330mm = 612pt x 936pt)
+    # Ukuran Kertas F4 dalam Point (612pt x 936pt)
     f4_size = (612, 936)
     
     doc = SimpleDocTemplate(
@@ -74,37 +74,37 @@ def generate_pdf_isian_data(data_dict):
         pagesize=f4_size,
         rightMargin=22,
         leftMargin=22,
-        topMargin=20,
-        bottomMargin=20
+        topMargin=15,
+        bottomMargin=15
     )
     
     styles = getSampleStyleSheet()
     
-    # Judul Dokumen
     title_style = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=12,
+        fontSize=11,
         alignment=1, # Center
-        spaceAfter=6,
+        spaceAfter=4,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor("#1A365D")
     )
     
-    # Judul Sub-Seksi
     section_style = ParagraphStyle(
         'SectionStyle',
         parent=styles['Heading2'],
-        fontSize=8.5,
+        fontSize=8,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor("#1A365D"),
         spaceBefore=0,
         spaceAfter=0
     )
     
-    # Text dalam Sel (Ditingkatkan ukurannya agar pas mengisi full 1 halaman F4)
-    cell_label_style = ParagraphStyle('CellLabel', fontSize=7.8, fontName='Helvetica-Bold', leading=9.5, textColor=colors.HexColor("#2D3748"))
-    cell_val_style = ParagraphStyle('CellVal', fontSize=7.8, fontName='Helvetica', leading=9.5, textColor=colors.HexColor("#1A202C"))
+    cell_label_style = ParagraphStyle('CellLabel', fontSize=7.2, fontName='Helvetica-Bold', leading=8.5, textColor=colors.HexColor("#2D3748"))
+    cell_val_style = ParagraphStyle('CellVal', fontSize=7.2, fontName='Helvetica', leading=8.5, textColor=colors.HexColor("#1A202C"))
+    
+    ttd_text_style = ParagraphStyle('TTDText', fontSize=8, fontName='Helvetica', alignment=1, leading=10)
+    ttd_nama_style = ParagraphStyle('TTDNama', fontSize=8.5, fontName='Helvetica-Bold', alignment=1, leading=10)
 
     story = []
     story.append(Paragraph("<b>LEMBAR ISIAN DATA CATIN & PELAKSANAAN AKAD</b>", title_style))
@@ -113,8 +113,8 @@ def generate_pdf_isian_data(data_dict):
     t_style = [
         ('BACKGROUND', (0,0), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1.8), # Padding optimal agar pas full 1 lembar F4
-        ('TOPPADDING', (0,0), (-1,-1), 1.8),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.2),
+        ('TOPPADDING', (0,0), (-1,-1), 1.2),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
         ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#CBD5E0")),
@@ -122,23 +122,43 @@ def generate_pdf_isian_data(data_dict):
 
     row_idx = 0
     for section, fields in data_dict.items():
-        # Header Seksi
         sec_p = Paragraph(f"<b>{section.upper()}</b>", section_style)
         table_data.append([sec_p, ""])
         t_style.append(('SPAN', (0, row_idx), (1, row_idx)))
         t_style.append(('BACKGROUND', (0, row_idx), (1, row_idx), colors.HexColor("#E2E8F0")))
         row_idx += 1
         
-        # Baris Data
         for k, v in fields.items():
             p_k = Paragraph(k, cell_label_style)
             p_v = Paragraph(str(v) if v else "-", cell_val_style)
             table_data.append([p_k, p_v])
             row_idx += 1
 
-    t = Table(table_data, colWidths=[155, 413])
+    t = Table(table_data, colWidths=[150, 418])
     t.setStyle(TableStyle(t_style))
     story.append(t)
+    
+    story.append(Spacer(1, 8))
+    
+    # Blok Tanda Tangan Kasi Pelayanan & Tanggal Terbit
+    ttd_data = [
+        ["", Paragraph(f"Tambi, {tgl_surat_val.replace('TAMBI,', '').strip()}", ttd_text_style)],
+        ["", Paragraph("Kasi Pelayanan", ttd_text_style)],
+        ["", Spacer(1, 28)], # Ruang TTD
+        ["", Paragraph("<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>", ttd_nama_style)]
+    ]
+    
+    ttd_table = Table(ttd_data, colWidths=[338, 230])
+    ttd_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,-1), 'CENTER'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+        ('TOPPADDING', (0,0), (-1,-1), 1),
+    ]))
+    
+    story.append(ttd_table)
     
     doc.build(story)
     buffer.seek(0)
@@ -153,7 +173,7 @@ except Exception as e:
 with st.form("catin_form"):
     st.header("📌 1. Data Surat & Pelaksanaan")
     no_register = st.text_input("Nomor Register", "400.12.3.2/007/ VII/ 2026")
-    tgl_surat = st.text_input("Tanggal Surat", "TAMBI, 29 JULI 2026")
+    tgl_surat = st.text_input("Tanggal Surat / Terbit Lembaran", "TAMBI, 29 JULI 2026")
     tgl_pelaksanaan = st.date_input("Tanggal Pelaksanaan Akad")
     jam_pelaksanaan = st.text_input("Jam Pelaksanaan", "JAM. 08.00")
     tempat_akad = st.text_area("Tempat Akad Nikah", "DI RUMAH MEMPELAI PUTRI RT 010 RW 002 DESA TAMBI WATUKUMPUL PEMALANG")
@@ -269,7 +289,6 @@ if submitted:
             wb = openpyxl.load_workbook(io.BytesIO(master_bytes))
             ws = wb["ISIAN DATA"]
 
-            # Perhitungan Umur
             u_pria = hitung_umur(pria_ttl)
             u_ayah_pria = hitung_umur(ayah_pria_ttl)
             u_ibu_pria = hitung_umur(ibu_pria_ttl)
@@ -280,10 +299,9 @@ if submitted:
             u_saksi1 = hitung_umur(saksi1_ttl)
             u_saksi2 = hitung_umur(saksi2_ttl)
             
-            # Hari Akad
             hari_akad = get_nama_hari(tgl_pelaksanaan)
 
-            # Input ke Excel Master (100% Asli)
+            # Penulisan Excel Master (100% Asli tanpa mengubah struktur)
             ws["G2"] = no_register
             ws["H3"] = f", {tgl_surat}"
             ws["G4"] = str(tgl_pelaksanaan)
@@ -386,11 +404,10 @@ if submitted:
                 
             with col2:
                 if HAS_REPORTLAB:
-                    # Susunan Data PDF Lengkap (Sangat Terstruktur)
                     pdf_data = {
                         "1. Surat & Pelaksanaan Akad": {
                             "No Register": no_register,
-                            "Tanggal Surat": tgl_surat,
+                            "Tgl Terbit Surat": tgl_surat,
                             "Hari / Tgl Akad": f"{hari_akad}, {tgl_pelaksanaan}",
                             "Jam Pelaksanaan": jam_pelaksanaan,
                             "Tempat Akad Nikah": tempat_akad
@@ -439,9 +456,9 @@ if submitted:
                             "Alamat Saksi 2": saksi2_alamat
                         }
                     }
-                    pdf_buffer = generate_pdf_isian_data(pdf_data)
+                    pdf_buffer = generate_pdf_isian_data(pdf_data, tgl_surat)
                     st.download_button(
-                        label="📄 Download PDF (Full 1 Halaman F4)",
+                        label="📄 Download PDF (Full 1 Halaman F4 + TTD)",
                         data=pdf_buffer,
                         file_name=f"ISIAN_DATA_{wanita_nama}.pdf",
                         mime="application/pdf",
