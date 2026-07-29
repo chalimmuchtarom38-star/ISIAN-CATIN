@@ -5,11 +5,15 @@ import re
 import gc
 from datetime import datetime
 
-# Impor reportlab untuk pembuatan PDF
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# Impor reportlab secara aman
+HAS_REPORTLAB = True
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+except ImportError:
+    HAS_REPORTLAB = False
 
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
@@ -43,6 +47,9 @@ def validasi_nik(nik, label):
     return None
 
 def generate_pdf_isian_data(data_dict):
+    if not HAS_REPORTLAB:
+        return None
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -58,7 +65,7 @@ def generate_pdf_isian_data(data_dict):
         'TitleStyle',
         parent=styles['Heading1'],
         fontSize=14,
-        alignment=1, # Center
+        alignment=1,
         spaceAfter=15
     )
     section_style = ParagraphStyle(
@@ -77,9 +84,7 @@ def generate_pdf_isian_data(data_dict):
     story.append(Spacer(1, 5))
 
     table_data = []
-    
     for section, fields in data_dict.items():
-        # Tambah header seksi
         sec_p = Paragraph(f"<b>{section.upper()}</b>", section_style)
         table_data.append([sec_p, ""])
         for k, v in fields.items():
@@ -97,7 +102,6 @@ def generate_pdf_isian_data(data_dict):
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E0")),
     ]
     
-    # Memberi warna latar belakang untuk baris Judul Seksi
     row_idx = 0
     for section, fields in data_dict.items():
         t_style.append(('SPAN', (0, row_idx), (1, row_idx)))
@@ -114,7 +118,7 @@ def generate_pdf_isian_data(data_dict):
 try:
     master_bytes = load_master_bytes()
 except Exception as e:
-    st.error(f"⚠️ Gagal membaca file master Excel '{EXCEL_MASTER}'. Error: {e}")
+    st.error(f"⚠️ Gagal membaca file master Excel '{EXCEL_MASTER}'. Pastikan nama file di GitHub persis sama. Error: {e}")
     st.stop()
 
 with st.form("catin_form"):
@@ -236,7 +240,6 @@ if submitted:
             wb = openpyxl.load_workbook(io.BytesIO(master_bytes))
             ws = wb["ISIAN DATA"]
 
-            # Isi data ke sheet ISIAN DATA
             ws["G2"] = no_register
             ws["H3"] = f", {tgl_surat}"
             ws["G4"] = str(tgl_pelaksanaan)
@@ -320,48 +323,11 @@ if submitted:
             ws["G79"] = saksi2_pekerjaan
             ws["G80"] = saksi2_alamat
 
-            # 1. Simpan Excel Utuh ke Buffer (Tanpa Mengubah Apapun pada Pengaturan Master)
             excel_buffer = io.BytesIO()
             wb.save(excel_buffer)
             excel_buffer.seek(0)
 
-            # 2. Susun Data Dict untuk Pembuatan PDF Isian Data
-            pdf_data = {
-                "Surat & Pelaksanaan Akad": {
-                    "No Register": no_register, "Tanggal Surat": tgl_surat,
-                    "Tanggal Akad": tgl_pelaksanaan, "Jam Akad": jam_pelaksanaan, "Tempat Akad": tempat_akad
-                },
-                "Calon Pengantin Laki-Laki": {
-                    "Nama Pria": pria_nama, "BIN": pria_bin, "NIK Pria": pria_nik,
-                    "TTL Pria": pria_ttl, "Pekerjaan": pria_pekerjaan, "Status": pria_status,
-                    "Pendidikan": pria_pendidikan, "Alamat": pria_alamat
-                },
-                "Orang Tua Pria": {
-                    "Nama Ayah Pria": f"{ayah_pria_nama} bin {ayah_pria_bin}", "NIK Ayah": ayah_pria_nik, "Alamat Ayah": ayah_pria_alamat,
-                    "Nama Ibu Pria": f"{ibu_pria_nama} binti {ibu_pria_bin}", "NIK Ibu": ibu_pria_nik, "Alamat Ibu": ibu_pria_alamat
-                },
-                "Calon Pengantin Perempuan": {
-                    "Nama Wanita": wanita_nama, "Binti": wanita_binti, "NIK Wanita": wanita_nik,
-                    "TTL Wanita": wanita_ttl, "Pekerjaan": wanita_pekerjaan, "Status": wanita_status,
-                    "Pendidikan": wanita_pendidikan, "Alamat": wanita_alamat
-                },
-                "Orang Tua Wanita": {
-                    "Nama Ayah Wanita": f"{ayah_wanita_nama} bin {ayah_wanita_bin}", "NIK Ayah": ayah_wanita_nik, "Alamat Ayah": ayah_wanita_alamat,
-                    "Nama Ibu Wanita": f"{ibu_wanita_nama} binti {ibu_wanita_bin}", "NIK Ibu": ibu_wanita_nik, "Alamat Ibu": ibu_wanita_alamat
-                },
-                "Wali & Mahar": {
-                    "Nama Wali": f"{wali_nama} bin {wali_bin}", "NIK Wali": wali_nik, "Hubungan": wali_hubungan,
-                    "Alamat Wali": wali_alamat, "Mahar / Maskawin": mahar
-                },
-                "Saksi-Saksi": {
-                    "Saksi 1": f"{saksi1_nama} (NIK: {saksi1_nik}) - {saksi1_alamat}",
-                    "Saksi 2": f"{saksi2_nama} (NIK: {saksi2_nik}) - {saksi2_alamat}"
-                }
-            }
-
-            pdf_buffer = generate_pdf_isian_data(pdf_data)
-
-            st.success("✅ Data berhasil diproses! Silakan pilih format download yang diinginkan di bawah ini:")
+            st.success("✅ Data berhasil diproses!")
 
             col1, col2 = st.columns(2)
             
@@ -375,13 +341,49 @@ if submitted:
                 )
                 
             with col2:
-                st.download_button(
-                    label="📄 Download PDF (Hanya Isian Data)",
-                    data=pdf_buffer,
-                    file_name=f"ISIAN_DATA_{wanita_nama}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
+                if HAS_REPORTLAB:
+                    pdf_data = {
+                        "Surat & Pelaksanaan Akad": {
+                            "No Register": no_register, "Tanggal Surat": tgl_surat,
+                            "Tanggal Akad": tgl_pelaksanaan, "Jam Akad": jam_pelaksanaan, "Tempat Akad": tempat_akad
+                        },
+                        "Calon Pengantin Laki-Laki": {
+                            "Nama Pria": pria_nama, "BIN": pria_bin, "NIK Pria": pria_nik,
+                            "TTL Pria": pria_ttl, "Pekerjaan": pria_pekerjaan, "Status": pria_status,
+                            "Pendidikan": pria_pendidikan, "Alamat": pria_alamat
+                        },
+                        "Orang Tua Pria": {
+                            "Nama Ayah Pria": f"{ayah_pria_nama} bin {ayah_pria_bin}", "NIK Ayah": ayah_pria_nik, "Alamat Ayah": ayah_pria_alamat,
+                            "Nama Ibu Pria": f"{ibu_pria_nama} binti {ibu_pria_bin}", "NIK Ibu": ibu_pria_nik, "Alamat Ibu": ibu_pria_alamat
+                        },
+                        "Calon Pengantin Perempuan": {
+                            "Nama Wanita": wanita_nama, "Binti": wanita_binti, "NIK Wanita": wanita_nik,
+                            "TTL Wanita": wanita_ttl, "Pekerjaan": wanita_pekerjaan, "Status": wanita_status,
+                            "Pendidikan": wanita_pendidikan, "Alamat": wanita_alamat
+                        },
+                        "Orang Tua Wanita": {
+                            "Nama Ayah Wanita": f"{ayah_wanita_nama} bin {ayah_wanita_bin}", "NIK Ayah": ayah_wanita_nik, "Alamat Ayah": ayah_wanita_alamat,
+                            "Nama Ibu Wanita": f"{ibu_wanita_nama} binti {ibu_wanita_bin}", "NIK Ibu": ibu_wanita_nik, "Alamat Ibu": ibu_wanita_alamat
+                        },
+                        "Wali & Mahar": {
+                            "Nama Wali": f"{wali_nama} bin {wali_bin}", "NIK Wali": wali_nik, "Hubungan": wali_hubungan,
+                            "Alamat Wali": wali_alamat, "Mahar / Maskawin": mahar
+                        },
+                        "Saksi-Saksi": {
+                            "Saksi 1": f"{saksi1_nama} (NIK: {saksi1_nik}) - {saksi1_alamat}",
+                            "Saksi 2": f"{saksi2_nama} (NIK: {saksi2_nik}) - {saksi2_alamat}"
+                        }
+                    }
+                    pdf_buffer = generate_pdf_isian_data(pdf_data)
+                    st.download_button(
+                        label="📄 Download PDF (Hanya Isian Data)",
+                        data=pdf_buffer,
+                        file_name=f"ISIAN_DATA_{wanita_nama}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("⚠️ Pustaka `reportlab` sedang diinstal oleh server. Silakan tambahkan `reportlab` ke requirements.txt lalu reboot app.")
 
             wb.close()
             gc.collect()
