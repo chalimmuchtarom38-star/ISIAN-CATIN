@@ -17,7 +17,7 @@ except ImportError:
 st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
 
 st.title("📝 Form Pengisian Data Catin")
-st.write("Isi formulir di bawah ini. Anda dapat mendownload file **Excel Utuh (Master 100%)** atau **PDF Isian Data (Full 1 Halaman F4)**.")
+st.write("Isi formulir di bawah ini. Download **Excel Utuh (Master 100%)** atau **PDF Isian Data (Full 1 Halaman F4 Lengkap)**.")
 
 EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
 
@@ -36,6 +36,21 @@ def hitung_umur(ttl_text):
         umur = tahun_sekarang - tahun_lahir
         return umur if umur >= 0 else ""
     return ""
+
+def get_nama_hari(tgl_obj):
+    if not tgl_obj:
+        return ""
+    hari_dict = {
+        'Monday': 'Senin',
+        'Tuesday': 'Selasa',
+        'Wednesday': 'Rabu',
+        'Thursday': 'Kamis',
+        'Friday': 'Jumat',
+        'Saturday': 'Sabtu',
+        'Sunday': 'Minggu'
+    }
+    english_day = tgl_obj.strftime('%A')
+    return hari_dict.get(english_day, english_day)
 
 def validasi_nik(nik, label):
     nik_str = str(nik).strip()
@@ -59,8 +74,8 @@ def generate_pdf_isian_data(data_dict):
         pagesize=f4_size,
         rightMargin=22,
         leftMargin=22,
-        topMargin=22,
-        bottomMargin=22
+        topMargin=20,
+        bottomMargin=20
     )
     
     styles = getSampleStyleSheet()
@@ -71,7 +86,7 @@ def generate_pdf_isian_data(data_dict):
         parent=styles['Heading1'],
         fontSize=12,
         alignment=1, # Center
-        spaceAfter=8,
+        spaceAfter=6,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor("#1A365D")
     )
@@ -87,9 +102,9 @@ def generate_pdf_isian_data(data_dict):
         spaceAfter=0
     )
     
-    # Text dalam Sel (Ditingkatkan ukurannya agar pas mengisi halaman)
-    cell_label_style = ParagraphStyle('CellLabel', fontSize=8, fontName='Helvetica-Bold', leading=10, textColor=colors.HexColor("#2D3748"))
-    cell_val_style = ParagraphStyle('CellVal', fontSize=8, fontName='Helvetica', leading=10, textColor=colors.HexColor("#1A202C"))
+    # Text dalam Sel (Ditingkatkan ukurannya agar pas mengisi full 1 halaman F4)
+    cell_label_style = ParagraphStyle('CellLabel', fontSize=7.8, fontName='Helvetica-Bold', leading=9.5, textColor=colors.HexColor("#2D3748"))
+    cell_val_style = ParagraphStyle('CellVal', fontSize=7.8, fontName='Helvetica', leading=9.5, textColor=colors.HexColor("#1A202C"))
 
     story = []
     story.append(Paragraph("<b>LEMBAR ISIAN DATA CATIN & PELAKSANAAN AKAD</b>", title_style))
@@ -98,11 +113,11 @@ def generate_pdf_isian_data(data_dict):
     t_style = [
         ('BACKGROUND', (0,0), (-1,-1), colors.white),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5), # Padding ditingkatkan agar tinggi tabel full 1 halaman
-        ('TOPPADDING', (0,0), (-1,-1), 2.5),
-        ('LEFTPADDING', (0,0), (-1,-1), 5),
-        ('RIGHTPADDING', (0,0), (-1,-1), 5),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E0")),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.8), # Padding optimal agar pas full 1 lembar F4
+        ('TOPPADDING', (0,0), (-1,-1), 1.8),
+        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#CBD5E0")),
     ]
 
     row_idx = 0
@@ -254,6 +269,21 @@ if submitted:
             wb = openpyxl.load_workbook(io.BytesIO(master_bytes))
             ws = wb["ISIAN DATA"]
 
+            # Perhitungan Umur
+            u_pria = hitung_umur(pria_ttl)
+            u_ayah_pria = hitung_umur(ayah_pria_ttl)
+            u_ibu_pria = hitung_umur(ibu_pria_ttl)
+            u_wanita = hitung_umur(wanita_ttl)
+            u_ayah_wanita = hitung_umur(ayah_wanita_ttl)
+            u_ibu_wanita = hitung_umur(ibu_wanita_ttl)
+            u_wali = hitung_umur(wali_ttl)
+            u_saksi1 = hitung_umur(saksi1_ttl)
+            u_saksi2 = hitung_umur(saksi2_ttl)
+            
+            # Hari Akad
+            hari_akad = get_nama_hari(tgl_pelaksanaan)
+
+            # Input ke Excel Master (100% Asli)
             ws["G2"] = no_register
             ws["H3"] = f", {tgl_surat}"
             ws["G4"] = str(tgl_pelaksanaan)
@@ -263,7 +293,7 @@ if submitted:
             ws["G8"] = pria_nama
             ws["G9"] = pria_bin
             ws["G10"] = pria_ttl
-            ws["K10"] = hitung_umur(pria_ttl)
+            ws["K10"] = u_pria
             ws["G11"] = str(pria_nik)
             ws["G12"] = pria_pekerjaan
             ws["G13"] = pria_status
@@ -274,7 +304,7 @@ if submitted:
             ws["J19"] = ayah_pria_bin
             ws["G20"] = str(ayah_pria_nik)
             ws["G21"] = ayah_pria_ttl
-            ws["K21"] = hitung_umur(ayah_pria_ttl)
+            ws["K21"] = u_ayah_pria
             ws["G22"] = ayah_pria_pekerjaan
             ws["G23"] = ayah_pria_alamat
 
@@ -282,14 +312,14 @@ if submitted:
             ws["I26"] = ibu_pria_bin
             ws["G27"] = str(ibu_pria_nik)
             ws["G28"] = ibu_pria_ttl
-            ws["K28"] = hitung_umur(ibu_pria_ttl)
+            ws["K28"] = u_ibu_pria
             ws["G29"] = ibu_pria_pekerjaan
             ws["G30"] = ibu_pria_alamat
 
             ws["G34"] = wanita_nama
             ws["G35"] = wanita_binti
             ws["G36"] = wanita_ttl
-            ws["K36"] = hitung_umur(wanita_ttl)
+            ws["K36"] = u_wanita
             ws["G37"] = str(wanita_nik)
             ws["G38"] = wanita_pekerjaan
             ws["G39"] = wanita_status
@@ -300,7 +330,7 @@ if submitted:
             ws["I45"] = ayah_wanita_bin
             ws["G46"] = str(ayah_wanita_nik)
             ws["G47"] = ayah_wanita_ttl
-            ws["K47"] = hitung_umur(ayah_wanita_ttl)
+            ws["K47"] = u_ayah_wanita
             ws["G48"] = ayah_wanita_pekerjaan
             ws["G49"] = ayah_wanita_alamat
 
@@ -308,7 +338,7 @@ if submitted:
             ws["I52"] = ibu_wanita_bin
             ws["G53"] = str(ibu_wanita_nik)
             ws["G54"] = ibu_wanita_ttl
-            ws["K54"] = hitung_umur(ibu_wanita_ttl)
+            ws["K54"] = u_ibu_wanita
             ws["G55"] = ibu_wanita_pekerjaan
             ws["G56"] = ibu_wanita_alamat
 
@@ -316,7 +346,7 @@ if submitted:
             ws["G59"] = wali_bin
             ws["G60"] = str(wali_nik)
             ws["G61"] = wali_ttl
-            ws["K61"] = hitung_umur(wali_ttl)
+            ws["K61"] = u_wali
             ws["G62"] = wali_pekerjaan
             ws["G63"] = wali_alamat
             ws["G64"] = wali_hubungan
@@ -325,14 +355,14 @@ if submitted:
 
             ws["G70"] = saksi1_nama
             ws["G71"] = saksi1_ttl
-            ws["K71"] = hitung_umur(saksi1_ttl)
+            ws["K71"] = u_saksi1
             ws["G72"] = str(saksi1_nik)
             ws["G73"] = saksi1_pekerjaan
             ws["G74"] = saksi1_alamat
 
             ws["G76"] = saksi2_nama
             ws["G77"] = saksi2_ttl
-            ws["K77"] = hitung_umur(saksi2_ttl)
+            ws["K77"] = u_saksi2
             ws["G78"] = str(saksi2_nik)
             ws["G79"] = saksi2_pekerjaan
             ws["G80"] = saksi2_alamat
@@ -356,63 +386,62 @@ if submitted:
                 
             with col2:
                 if HAS_REPORTLAB:
+                    # Susunan Data PDF Lengkap (Sangat Terstruktur)
                     pdf_data = {
                         "1. Surat & Pelaksanaan Akad": {
                             "No Register": no_register,
                             "Tanggal Surat": tgl_surat,
-                            "Tanggal Pelaksanaan Akad": str(tgl_pelaksanaan),
+                            "Hari / Tgl Akad": f"{hari_akad}, {tgl_pelaksanaan}",
                             "Jam Pelaksanaan": jam_pelaksanaan,
                             "Tempat Akad Nikah": tempat_akad
                         },
                         "2. Calon Pengantin Laki-Laki": {
-                            "Nama Laki-Laki": pria_nama,
-                            "BIN (Ayah Laki-Laki)": pria_bin,
-                            "TTL (Pria)": pria_ttl,
+                            "Nama Laki-Laki": f"{pria_nama} bin {pria_bin}",
+                            "TTL / Umur": f"{pria_ttl} ({u_pria} Thn)",
                             "NIK (Pria)": pria_nik,
-                            "Pekerjaan (Pria)": pria_pekerjaan,
-                            "Status / Pendidikan": f"{pria_status} / {pria_pendidikan}",
+                            "Pekerjaan / Pendidikan": f"{pria_pekerjaan} / {pria_pendidikan}",
+                            "Status Pernikahan": pria_status,
                             "Alamat (Pria)": pria_alamat
                         },
                         "Orang Tua Laki-Laki": {
-                            "Ayah Laki-Laki": f"{ayah_pria_nama} bin {ayah_pria_bin} (NIK: {ayah_pria_nik} | TTL: {ayah_pria_ttl})",
+                            "Ayah Laki-Laki": f"{ayah_pria_nama} bin {ayah_pria_bin} (NIK: {ayah_pria_nik} | TTL: {ayah_pria_ttl} - {u_ayah_pria} Thn)",
                             "Pekerjaan / Alamat Ayah": f"{ayah_pria_pekerjaan} - {ayah_pria_alamat}",
-                            "Ibu Laki-Laki": f"{ibu_pria_nama} binti {ibu_pria_bin} (NIK: {ibu_pria_nik} | TTL: {ibu_pria_ttl})",
+                            "Ibu Laki-Laki": f"{ibu_pria_nama} binti {ibu_pria_bin} (NIK: {ibu_pria_nik} | TTL: {ibu_pria_ttl} - {u_ibu_pria} Thn)",
                             "Pekerjaan / Alamat Ibu": f"{ibu_pria_pekerjaan} - {ibu_pria_alamat}"
                         },
                         "3. Calon Pengantin Perempuan": {
-                            "Nama Perempuan": wanita_nama,
-                            "BINTI (Ayah Perempuan)": wanita_binti,
-                            "TTL (Perempuan)": wanita_ttl,
+                            "Nama Perempuan": f"{wanita_nama} binti {wanita_binti}",
+                            "TTL / Umur": f"{wanita_ttl} ({u_wanita} Thn)",
                             "NIK (Perempuan)": wanita_nik,
-                            "Pekerjaan (Perempuan)": wanita_pekerjaan,
-                            "Status / Pendidikan": f"{wanita_status} / {wanita_pendidikan}",
+                            "Pekerjaan / Pendidikan": f"{wanita_pekerjaan} / {wanita_pendidikan}",
+                            "Status Pernikahan": wanita_status,
                             "Alamat (Perempuan)": wanita_alamat
                         },
                         "Orang Tua Perempuan": {
-                            "Ayah Perempuan": f"{ayah_wanita_nama} bin {ayah_wanita_bin} (NIK: {ayah_wanita_nik} | TTL: {ayah_wanita_ttl})",
+                            "Ayah Perempuan": f"{ayah_wanita_nama} bin {ayah_wanita_bin} (NIK: {ayah_wanita_nik} | TTL: {ayah_wanita_ttl} - {u_ayah_wanita} Thn)",
                             "Pekerjaan / Alamat Ayah": f"{ayah_wanita_pekerjaan} - {ayah_wanita_alamat}",
-                            "Ibu Perempuan": f"{ibu_wanita_nama} binti {ibu_wanita_bin} (NIK: {ibu_wanita_nik} | TTL: {ibu_wanita_ttl})",
+                            "Ibu Perempuan": f"{ibu_wanita_nama} binti {ibu_wanita_bin} (NIK: {ibu_wanita_nik} | TTL: {ibu_wanita_ttl} - {u_ibu_wanita} Thn)",
                             "Pekerjaan / Alamat Ibu": f"{ibu_wanita_pekerjaan} - {ibu_wanita_alamat}"
                         },
                         "4. Wali & Mahar": {
                             "Nama Wali / BIN": f"{wali_nama} bin {wali_bin} (Lengkap: {nama_lengkap_wali_b68})",
-                            "NIK / TTL Wali": f"{wali_nik} / {wali_ttl}",
+                            "NIK / TTL / Umur Wali": f"{wali_nik} / {wali_ttl} ({u_wali} Thn)",
                             "Pekerjaan / Hubungan": f"{wali_pekerjaan} / {wali_hubungan}",
                             "Alamat Wali": wali_alamat,
-                            "Mahar": mahar
+                            "Mahar / Maskawin": mahar
                         },
                         "5. Saksi-Saksi Nikah": {
                             "Saksi 1 (Nama / NIK)": f"{saksi1_nama} (NIK: {saksi1_nik})",
-                            "TTL / Pekerjaan Saksi 1": f"{saksi1_ttl} / {saksi1_pekerjaan}",
+                            "TTL / Umur / Pekerjaan": f"{saksi1_ttl} ({u_saksi1} Thn) / {saksi1_pekerjaan}",
                             "Alamat Saksi 1": saksi1_alamat,
                             "Saksi 2 (Nama / NIK)": f"{saksi2_nama} (NIK: {saksi2_nik})",
-                            "TTL / Pekerjaan Saksi 2": f"{saksi2_ttl} / {saksi2_pekerjaan}",
+                            "TTL / Umur / Pekerjaan": f"{saksi2_ttl} ({u_saksi2} Thn) / {saksi2_pekerjaan}",
                             "Alamat Saksi 2": saksi2_alamat
                         }
                     }
                     pdf_buffer = generate_pdf_isian_data(pdf_data)
                     st.download_button(
-                        label="📄 Download PDF (1 Halaman Full F4)",
+                        label="📄 Download PDF (Full 1 Halaman F4)",
                         data=pdf_buffer,
                         file_name=f"ISIAN_DATA_{wanita_nama}.pdf",
                         mime="application/pdf",
