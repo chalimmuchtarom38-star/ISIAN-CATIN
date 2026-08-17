@@ -1,16 +1,14 @@
 import streamlit as st
 import openpyxl
 from io import BytesIO
-from datetime import datetime, date
+from datetime import date
 
-# Library untuk Pembuatan PDF Ukuran F4
-from reportlab.lib.pagesizes import landscape
-from reportlab.pdfgen import canvas
+# Library ReportLab untuk Pembuatan PDF Ukuran F4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-# Ukuran Kertas F4 dalam Points (215.9 mm x 330 mm)
+# Ukuran Kertas F4 / Folio dalam Points (215.9 mm x 330 mm)
 F4_WIDTH = 215.9 * 2.83465
 F4_HEIGHT = 330.0 * 2.83465
 F4_SIZE = (F4_WIDTH, F4_HEIGHT)
@@ -21,16 +19,211 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📜 Form Input Berkas Catin Desa Tambi")
-st.caption("Mengisi sheet 'ISIAN DATA' tanpa merusak rumus. Menyediakan unduhan Excel utuh & PDF Surat Pengantar (F4).")
+st.title("📜 Form Input & Cetak PDF ISIAN DATA Catin")
+st.caption("Memproses dan mengunduh seluruh isi ringkasan 'ISIAN DATA' dalam format PDF ukuran F4/Folio tanpa ada yang terbuang.")
 
 EXCEL_FILE = "BERKAS CATIN .xlsx"
+
+# --------------------------------------------------
+# FUNGSI MEMBUAT PDF SELURUH 'ISIAN DATA' UKURAN F4
+# --------------------------------------------------
+def generate_pdf_isian_data(d):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=F4_SIZE,
+        leftMargin=28,
+        rightMargin=28,
+        topMargin=25,
+        bottomMargin=25
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    style_kop = ParagraphStyle('KopHead', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, alignment=1, leading=13)
+    style_title = ParagraphStyle('TitlePDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, alignment=1, leading=14)
+    style_sec = ParagraphStyle('SecHeader', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=11, textColor=colors.HexColor('#1A365D'))
+    style_lbl = ParagraphStyle('Lbl', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=10.5)
+    style_bold = ParagraphStyle('LblB', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8.5, leading=10.5)
+    style_val = ParagraphStyle('Val', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=10.5)
+
+    elements = []
+
+    # KOP SURAT & JUDUL
+    elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG - KECAMATAN WATUKUMPUL", style_kop))
+    elements.append(Paragraph("PEMERINTAH DESA TAMBI", style_kop))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph("<u>RINGKASAN ISIAN DATA BERKAS CATIN</u>", style_title))
+    elements.append(Spacer(1, 6))
+
+    # HELPER TABLE BUILDER
+    def build_table(data_rows, col_widths=[20, 150, 10, 350]):
+        table_content = []
+        for row in data_rows:
+            no_str = f"{row[0]}." if row[0] else ""
+            table_content.append([
+                Paragraph(no_str, style_lbl),
+                Paragraph(row[1], style_lbl),
+                Paragraph(":", style_lbl),
+                Paragraph(str(row[2]) if row[2] else "-", style_bold if len(row) > 3 and row[3] else style_val)
+            ])
+        t = Table(table_content, colWidths=col_widths)
+        t.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('TOPPADDING', (0,0), (-1,-1), 1),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+            ('LEFTPADDING', (0,0), (-1,-1), 2),
+            ('RIGHTPADDING', (0,0), (-1,-1), 2),
+        ]))
+        return t
+
+    # SECTION 1: REGISTER & PELAKSANAAN
+    elements.append(Paragraph("A. REGISTER & PELAKSANAAN AKAD NIKAH", style_sec))
+    reg_rows = [
+        ["", "Nomor Register", d['no_register']],
+        ["", "Tanggal Surat", d['tgl_surat']],
+        ["", "Tanggal Pelaksanaan", f"{d['tgl_pelaksanaan']} (Jam: {d['jam_akad']})"],
+        ["", "Tempat Akad Nikah", d['tempat_akad']],
+        ["", "Email Catin", d['email_catin']],
+        ["", "Maskawin / Mahar", d['mahar'], True]
+    ]
+    elements.append(build_table(reg_rows))
+    elements.append(Spacer(1, 4))
+
+    # SECTION 2: CATIN LAKI-LAKI
+    elements.append(Paragraph("B. DATA CALON PENGANTIN LAKI-LAKI", style_sec))
+    lk_rows = [
+        [1, "Nama Lengkap", d['nama_lk'], True],
+        [2, "Bin", d['bin_lk']],
+        [3, "Tempat, Tanggal Lahir (Umur)", f"{d['ttl_lk']} ({d['umur_lk']} Tahun)"],
+        [4, "NIK", d['nik_lk']],
+        [5, "Pekerjaan", d['pekerjaan_lk']],
+        [6, "Status Pernikahan", d['status_lk']],
+        [7, "Jenis Kelamin", d['jk_lk']],
+        [8, "Nama Istri Terdahulu", d['istri_terdahulu']],
+        [9, "Alamat Tempat Tinggal", d['alamat_lk']],
+        [10, "Pendidikan Terakhir", d['pendidikan_lk']]
+    ]
+    elements.append(build_table(lk_rows))
+    elements.append(Spacer(1, 4))
+
+    # AYAH LAKI-LAKI
+    elements.append(Paragraph("C. DATA AYAH CATIN LAKI-LAKI", style_sec))
+    ayah_lk_rows = [
+        [1, "Nama Ayah Laki-Laki", f"{d['nama_ayah_lk']} bin {d['bin_ayah_lk']}"],
+        [2, "NIK", d['nik_ayah_lk']],
+        [3, "Tempat, Tanggal Lahir (Umur)", f"{d['ttl_ayah_lk']} ({d['umur_ayah_lk']} Tahun)"],
+        [4, "Pekerjaan", d['pekerjaan_ayah_lk']],
+        [5, "Alamat Tempat Tinggal", d['alamat_ayah_lk']]
+    ]
+    elements.append(build_table(ayah_lk_rows))
+    elements.append(Spacer(1, 4))
+
+    # IBU LAKI-LAKI
+    elements.append(Paragraph("D. DATA IBU CATIN LAKI-LAKI", style_sec))
+    ibu_lk_rows = [
+        [1, "Nama Ibu Laki-Laki", f"{d['nama_ibu_lk']} bin {d['bin_ibu_lk']}"],
+        [2, "NIK", d['nik_ibu_lk']],
+        [3, "Tempat, Tanggal Lahir (Umur)", f"{d['ttl_ibu_lk']} ({d['umur_ibu_lk']} Tahun)"],
+        [4, "Pekerjaan", d['pekerjaan_ibu_lk']],
+        [5, "Alamat Tempat Tinggal", d['alamat_ibu_lk']]
+    ]
+    elements.append(build_table(ibu_lk_rows))
+    elements.append(Spacer(1, 4))
+
+    # SECTION 3: CATIN PEREMPUAN
+    elements.append(Paragraph("E. DATA CALON PENGANTIN PEREMPUAN", style_sec))
+    pr_rows = [
+        [1, "Nama Lengkap", d['nama_pr'], True],
+        [2, "Binti", d['binti_pr']],
+        [3, "Tempat, Tanggal Lahir (Umur)", f"{d['ttl_pr']} ({d['umur_pr']} Tahun)"],
+        [4, "NIK", d['nik_pr']],
+        [5, "Pekerjaan", d['pekerjaan_pr']],
+        [6, "Status Pernikahan", d['status_pr']],
+        [7, "Jenis Kelamin", d['jk_pr']],
+        [8, "Alamat Tempat Tinggal", d['alamat_pr']],
+        [9, "Nama Suami Terdahulu", d['suami_terdahulu']],
+        [10, "Pendidikan Terakhir", d['pendidikan_pr']]
+    ]
+    elements.append(build_table(pr_rows))
+    elements.append(Spacer(1, 4))
+
+    # AYAH PEREMPUAN
+    elements.append(Paragraph("F. DATA AYAH CATIN PEREMPUAN", style_sec))
+    ayah_pr_rows = [
+        [1, "Nama Ayah Perempuan", f"{d['nama_ayah_pr']} bin {d['bin_ayah_pr']}"],
+        [2, "NIK", d['nik_ayah_pr']],
+        [3, "Tempat, Tanggal Lahir (Umur)", f"{d['ttl_ayah_pr']} ({d['umur_ayah_pr']} Tahun)"],
+        [4, "Pekerjaan", d['pekerjaan_ayah_pr']],
+        [5, "Alamat Tempat Tinggal", d['alamat_ayah_pr']]
+    ]
+    elements.append(build_table(ayah_pr_rows))
+    elements.append(Spacer(1, 4))
+
+    # IBU PEREMPUAN
+    elements.append(Paragraph("G. DATA IBU CATIN PEREMPUAN", style_sec))
+    ibu_pr_rows = [
+        [1, "Nama Ibu Perempuan", f"{d['nama_ibu_pr']} bin {d['bin_ibu_pr']}"],
+        [2, "NIK", d['nik_ibu_pr']],
+        [3, "Tempat, Tanggal Lahir (Umur)", f"{d['ttl_ibu_pr']} ({d['umur_ibu_pr']} Tahun)"],
+        [4, "Pekerjaan", d['pekerjaan_ibu_pr']],
+        [5, "Alamat Tempat Tinggal", d['alamat_ibu_pr']]
+    ]
+    elements.append(build_table(ibu_pr_rows))
+    elements.append(Spacer(1, 4))
+
+    # SECTION 4: DATA WALI
+    elements.append(Paragraph("H. DATA WALI NIKAH", style_sec))
+    wali_rows = [
+        [1, "Nama Wali", d['nama_wali']],
+        [2, "Bin Wali", d['bin_wali']],
+        [3, "NIK Wali", d['nik_wali']],
+        [4, "Tempat, Tanggal Lahir (Umur)", f"{d['ttl_wali']} ({d['umur_wali']} Tahun)"],
+        [5, "Pekerjaan Wali", d['pekerjaan_wali']],
+        [6, "Alamat Tempat Tinggal", d['alamat_wali']],
+        [7, "Hubungan Wali", d['hubungan_wali']],
+        [8, "Nama Wali Lengkap", d['nama_wali_lengkap'], True]
+    ]
+    elements.append(build_table(wali_rows))
+    elements.append(Spacer(1, 4))
+
+    # SECTION 5: DATA SAKSI 1 & SAKSI 2
+    elements.append(Paragraph("I. DATA SAKSI NIKAH (SAKSI 1 & SAKSI 2)", style_sec))
+    saksi_rows = [
+        [1, "Nama Saksi 1", d['saksi1_nama']],
+        [2, "TTL / Umur Saksi 1", f"{d['saksi1_ttl']} ({d['saksi1_umur']} Tahun)"],
+        [3, "NIK Saksi 1", d['saksi1_nik']],
+        [4, "Pekerjaan / Alamat Saksi 1", f"{d['saksi1_pekerjaan']} / {d['saksi1_alamat']}"],
+        [5, "Nama Saksi 2", d['saksi2_nama']],
+        [6, "TTL / Umur Saksi 2", f"{d['saksi2_ttl']} ({d['saksi2_umur']} Tahun)"],
+        [7, "NIK Saksi 2", d['saksi2_nik']],
+        [8, "Pekerjaan / Alamat Saksi 2", f"{d['saksi2_pekerjaan']} / {d['saksi2_alamat']}"]
+    ]
+    elements.append(build_table(saksi_rows))
+    elements.append(Spacer(1, 10))
+
+    # TANDA TANGAN
+    ttd_table = Table([
+        ["", f"{d['tgl_surat']}"],
+        ["", "Kepala Desa Tambi / Kasi Pelayanan"],
+        ["", "\n\n"],
+        ["", "<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>"]
+    ], colWidths=[300, 230])
+    ttd_table.setStyle(TableStyle([
+        ('ALIGN', (1,0), (1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+    ]))
+    elements.append(ttd_table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
 
 # --------------------------------------------------
 # FORMULIR INPUT DATA
 # --------------------------------------------------
 with st.form("form_catin"):
-    
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📝 Register & Akad",
         "👨 Catin Laki-Laki & Ortu",
@@ -39,7 +232,6 @@ with st.form("form_catin"):
         "👥 Data Saksi 1 & 2"
     ])
     
-    # --- TAB 1: REGISTER & AKAD ---
     with tab1:
         st.subheader("Surat & Pelaksanaan Akad Nikah")
         col1, col2 = st.columns(2)
@@ -53,7 +245,6 @@ with st.form("form_catin"):
             email_catin = st.text_input("Email Catin", value="")
             mahar = st.text_input("Maskawin / Mahar", value="Seperangkat Alat Sholat")
 
-    # --- TAB 2: CATIN LAKI-LAKI & ORTU ---
     with tab2:
         st.subheader("Data Calon Pengantin Laki-Laki")
         col_lk1, col_lk2 = st.columns(2)
@@ -94,7 +285,6 @@ with st.form("form_catin"):
             pekerjaan_ibu_lk = st.text_input("Pekerjaan Ibu Laki-Laki", value="Mengurus Rumah Tangga")
             alamat_ibu_lk = st.text_area("Alamat Ibu Laki-Laki", value="RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang")
 
-    # --- TAB 3: CATIN PEREMPUAN & ORTU ---
     with tab3:
         st.subheader("Data Calon Pengantin Perempuan")
         col_pr1, col_pr2 = st.columns(2)
@@ -135,7 +325,6 @@ with st.form("form_catin"):
             pekerjaan_ibu_pr = st.text_input("Pekerjaan Ibu Perempuan", value="Mengurus Rumah Tangga")
             alamat_ibu_pr = st.text_area("Alamat Ibu Perempuan", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
-    # --- TAB 4: DATA WALI ---
     with tab4:
         st.subheader("Data Wali Nikah")
         col_w1, col_w2 = st.columns(2)
@@ -151,7 +340,6 @@ with st.form("form_catin"):
             hubungan_wali = st.text_input("Hubungan Wali", value="AYAH KANDUNG")
             nama_wali_lengkap = st.text_input("Nama Wali Lengkap", value="Disun Bin Tawiroji")
 
-    # --- TAB 5: DATA SAKSI 1 & 2 ---
     with tab5:
         col_s1, col_s2 = st.columns(2)
         with col_s1:
@@ -167,6 +355,7 @@ with st.form("form_catin"):
             st.subheader("Data Saksi 2")
             saksi2_nama = st.text_input("Nama Saksi 2", value="Sidin")
             saksi2_ttl = st.text_input("TTL Saksi 2", value="Pemalang, ")
+            saksi2_umur = st.number_input("Umur Saksi 2", value=0)
             saksi2_nik = st.text_input("NIK Saksi 2", value="0000000000000000")
             saksi2_pekerjaan = st.text_input("Pekerjaan Saksi 2", value="")
             saksi2_alamat = st.text_area("Alamat Saksi 2", value="")
@@ -175,110 +364,7 @@ with st.form("form_catin"):
 
 
 # --------------------------------------------------
-# FUNGSI MEMBUAT PDF SURAT PENGANTAR HALAMAN DEPAN (UKURAN F4)
-# --------------------------------------------------
-def create_f4_pdf(data_dict):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=F4_SIZE,
-        leftMargin=36,
-        rightMargin=36,
-        topMargin=36,
-        bottomMargin=36
-    )
-    
-    styles = getSampleStyleSheet()
-    
-    style_kop_head = ParagraphStyle('KopHead', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, alignment=1, leading=14)
-    style_kop_sub = ParagraphStyle('KopSub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, alignment=1, leading=16)
-    style_title = ParagraphStyle('TitlePDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, alignment=1, leading=14)
-    style_body = ParagraphStyle('BodyPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=13)
-    style_bold = ParagraphStyle('BoldPDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, leading=13)
-
-    elements = []
-
-    # KOP SURAT
-    elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG", style_kop_head))
-    elements.append(Paragraph("KECAMATAN WATUKUMPUL", style_kop_head))
-    elements.append(Paragraph("DESA TAMBI", style_kop_sub))
-    elements.append(Spacer(1, 10))
-
-    # JUDUL SURAT
-    elements.append(Paragraph("<u>PENGANTAR NIKAH</u>", style_title))
-    elements.append(Paragraph(f"Nomor: {data_dict['no_register']}", style_title))
-    elements.append(Spacer(1, 12))
-
-    elements.append(Paragraph("Yang bertanda tangan di bawah ini menjelaskan dengan sesungguhnya bahwa:", style_body))
-    elements.append(Spacer(1, 8))
-
-    # TABLE DATA CATIN LAKI-LAKI
-    table_data = [
-        [Paragraph("1.", style_body), Paragraph("Nama Lengkap", style_body), Paragraph(":", style_body), Paragraph(data_dict['nama_lk'], style_bold)],
-        [Paragraph("2.", style_body), Paragraph("NIK", style_body), Paragraph(":", style_body), Paragraph(data_dict['nik_lk'], style_body)],
-        [Paragraph("3.", style_body), Paragraph("Jenis Kelamin", style_body), Paragraph(":", style_body), Paragraph(data_dict['jk_lk'], style_body)],
-        [Paragraph("4.", style_body), Paragraph("Tempat, Tgl Lahir", style_body), Paragraph(":", style_body), Paragraph(data_dict['ttl_lk'], style_body)],
-        [Paragraph("5.", style_body), Paragraph("Pekerjaan", style_body), Paragraph(":", style_body), Paragraph(data_dict['pekerjaan_lk'], style_body)],
-        [Paragraph("6.", style_body), Paragraph("Status Pernikahan", style_body), Paragraph(":", style_body), Paragraph(data_dict['status_lk'], style_body)],
-        [Paragraph("7.", style_body), Paragraph("Alamat", style_body), Paragraph(":", style_body), Paragraph(data_dict['alamat_lk'], style_body)],
-    ]
-
-    t1 = Table(table_data, colWidths=[20, 130, 15, 380])
-    t1.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
-    elements.append(t1)
-    elements.append(Spacer(1, 10))
-
-    elements.append(Paragraph("Adalah benar-benar anak dari pernikahan seorang pria:", style_body))
-    elements.append(Spacer(1, 6))
-
-    # TABLE AYAH
-    table_ayah = [
-        [Paragraph("1.", style_body), Paragraph("Nama Ayah", style_body), Paragraph(":", style_body), Paragraph(f"{data_dict['nama_ayah_lk']} bin {data_dict['bin_ayah_lk']}", style_body)],
-        [Paragraph("2.", style_body), Paragraph("NIK Ayah", style_body), Paragraph(":", style_body), Paragraph(data_dict['nik_ayah_lk'], style_body)],
-        [Paragraph("3.", style_body), Paragraph("Tempat, Tgl Lahir", style_body), Paragraph(":", style_body), Paragraph(data_dict['ttl_ayah_lk'], style_body)],
-        [Paragraph("4.", style_body), Paragraph("Pekerjaan / Alamat", style_body), Paragraph(":", style_body), Paragraph(f"{data_dict['pekerjaan_ayah_lk']} / {data_dict['alamat_ayah_lk']}", style_body)],
-    ]
-    t2 = Table(table_ayah, colWidths=[20, 130, 15, 380])
-    t2.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
-    elements.append(t2)
-    elements.append(Spacer(1, 10))
-
-    # CALON PASANGAN
-    elements.append(Paragraph("Dan hendak menikah dengan calon pasangan:", style_body))
-    elements.append(Spacer(1, 6))
-
-    table_pasangan = [
-        [Paragraph("1.", style_body), Paragraph("Nama Calon Istri", style_body), Paragraph(":", style_body), Paragraph(f"{data_dict['nama_pr']} binti {data_dict['binti_pr']}", style_bold)],
-        [Paragraph("2.", style_body), Paragraph("NIK", style_body), Paragraph(":", style_body), Paragraph(data_dict['nik_pr'], style_body)],
-        [Paragraph("3.", style_body), Paragraph("Tempat, Tgl Lahir", style_body), Paragraph(":", style_body), Paragraph(data_dict['ttl_pr'], style_body)],
-        [Paragraph("4.", style_body), Paragraph("Alamat", style_body), Paragraph(":", style_body), Paragraph(data_dict['alamat_pr'], style_body)],
-    ]
-    t3 = Table(table_pasangan, colWidths=[20, 130, 15, 380])
-    t3.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
-    elements.append(t3)
-    elements.append(Spacer(1, 15))
-
-    # TANDA TANGAN
-    data_ttd = [
-        ["", f"{data_dict['tgl_surat']}"],
-        ["", "Kepala Desa / Kasi Pelayanan"],
-        ["", "\n\n\n"],
-        ["", "<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>"]
-    ]
-    t_ttd = Table(data_ttd, colWidths=[300, 245])
-    t_ttd.setStyle(TableStyle([
-        ('ALIGN', (1,0), (1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
-    ]))
-    elements.append(t_ttd)
-
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-
-# --------------------------------------------------
-# PROSES EKSEKUSI PENYIMPANAN EXCEL & GENERATE PDF
+# PROSES UPDATE EXCEL & GENERATE PDF F4
 # --------------------------------------------------
 if submit:
     try:
@@ -291,6 +377,7 @@ if submit:
             'G4': tgl_pelaksanaan.strftime('%Y-%m-%d'),
             'G5': jam_akad,
             'G6': tempat_akad,
+            'K4': email_catin,
             'G8': nama_lk,
             'G9': bin_lk,
             'G10': ttl_lk,
@@ -359,6 +446,7 @@ if submit:
             'G74': saksi1_alamat,
             'G76': saksi2_nama,
             'G77': saksi2_ttl,
+            'K77': saksi2_umur,
             'G78': saksi2_nik,
             'G79': saksi2_pekerjaan,
             'G80': saksi2_alamat,
@@ -367,39 +455,35 @@ if submit:
         for cell_ref, val in cell_updates.items():
             sheet[cell_ref] = val
 
-        # Save Excel to memory
         output_excel = BytesIO()
         wb.save(output_excel)
         output_excel.seek(0)
 
-        # Build PDF Data Dict
-        data_pdf = {
-            'no_register': no_register,
-            'tgl_surat': tgl_surat,
-            'nama_lk': nama_lk,
-            'bin_lk': bin_lk,
-            'nik_lk': nik_lk,
-            'jk_lk': jk_lk,
-            'ttl_lk': ttl_lk,
-            'pekerjaan_lk': pekerjaan_lk,
-            'status_lk': status_lk,
-            'alamat_lk': alamat_lk,
-            'nama_ayah_lk': nama_ayah_lk,
-            'bin_ayah_lk': bin_ayah_lk,
-            'nik_ayah_lk': nik_ayah_lk,
-            'ttl_ayah_lk': ttl_ayah_lk,
-            'pekerjaan_ayah_lk': pekerjaan_ayah_lk,
-            'alamat_ayah_lk': alamat_ayah_lk,
-            'nama_pr': nama_pr,
-            'binti_pr': binti_pr,
-            'nik_pr': nik_pr,
-            'ttl_pr': ttl_pr,
-            'alamat_pr': alamat_pr
+        data_dict = {
+            'no_register': no_register, 'tgl_surat': tgl_surat, 'tgl_pelaksanaan': tgl_pelaksanaan.strftime('%d-%m-%Y'),
+            'jam_akad': jam_akad, 'tempat_akad': tempat_akad, 'email_catin': email_catin, 'mahar': mahar,
+            'nama_lk': nama_lk, 'bin_lk': bin_lk, 'ttl_lk': ttl_lk, 'umur_lk': umur_lk, 'nik_lk': nik_lk,
+            'pekerjaan_lk': pekerjaan_lk, 'status_lk': status_lk, 'jk_lk': jk_lk, 'istri_terdahulu': istri_terdahulu,
+            'alamat_lk': alamat_lk, 'pendidikan_lk': pendidikan_lk, 'nama_ayah_lk': nama_ayah_lk, 'bin_ayah_lk': bin_ayah_lk,
+            'nik_ayah_lk': nik_ayah_lk, 'ttl_ayah_lk': ttl_ayah_lk, 'umur_ayah_lk': umur_ayah_lk, 'pekerjaan_ayah_lk': pekerjaan_ayah_lk,
+            'alamat_ayah_lk': alamat_ayah_lk, 'nama_ibu_lk': nama_ibu_lk, 'bin_ibu_lk': bin_ibu_lk, 'nik_ibu_lk': nik_ibu_lk,
+            'ttl_ibu_lk': ttl_ibu_lk, 'umur_ibu_lk': umur_ibu_lk, 'pekerjaan_ibu_lk': pekerjaan_ibu_lk, 'alamat_ibu_lk': alamat_ibu_lk,
+            'nama_pr': nama_pr, 'binti_pr': binti_pr, 'ttl_pr': ttl_pr, 'umur_pr': umur_pr, 'nik_pr': nik_pr,
+            'pekerjaan_pr': pekerjaan_pr, 'status_pr': status_pr, 'jk_pr': jk_pr, 'alamat_pr': alamat_pr,
+            'suami_terdahulu': suami_terdahulu, 'pendidikan_pr': pendidikan_pr, 'nama_ayah_pr': nama_ayah_pr, 'bin_ayah_pr': bin_ayah_pr,
+            'nik_ayah_pr': nik_ayah_pr, 'ttl_ayah_pr': ttl_ayah_pr, 'umur_ayah_pr': umur_ayah_pr, 'pekerjaan_ayah_pr': pekerjaan_ayah_pr,
+            'alamat_ayah_pr': alamat_ayah_pr, 'nama_ibu_pr': nama_ibu_pr, 'bin_ibu_pr': bin_ibu_pr, 'nik_ibu_pr': nik_ibu_pr,
+            'ttl_ibu_pr': ttl_ibu_pr, 'umur_ibu_pr': umur_ibu_pr, 'pekerjaan_ibu_pr': pekerjaan_ibu_pr, 'alamat_ibu_pr': alamat_ibu_pr,
+            'nama_wali': nama_wali, 'bin_wali': bin_wali, 'nik_wali': nik_wali, 'ttl_wali': ttl_wali, 'umur_wali': umur_wali,
+            'pekerjaan_wali': pekerjaan_wali, 'alamat_wali': alamat_wali, 'hubungan_wali': hubungan_wali, 'nama_wali_lengkap': nama_wali_lengkap,
+            'saksi1_nama': saksi1_nama, 'saksi1_ttl': saksi1_ttl, 'saksi1_umur': saksi1_umur, 'saksi1_nik': saksi1_nik,
+            'saksi1_pekerjaan': saksi1_pekerjaan, 'saksi1_alamat': saksi1_alamat, 'saksi2_nama': saksi2_nama, 'saksi2_ttl': saksi2_ttl,
+            'saksi2_umur': saksi2_umur, 'saksi2_nik': saksi2_nik, 'saksi2_pekerjaan': saksi2_pekerjaan, 'saksi2_alamat': saksi2_alamat
         }
 
-        pdf_bytes = create_f4_pdf(data_pdf)
+        output_pdf = generate_pdf_isian_data(data_dict)
 
-        st.success("✅ Data berhasil diproses! Silakan pilih berkas yang ingin diunduh di bawah ini:")
+        st.success("✅ Data berhasil diproses!")
 
         col_d1, col_d2 = st.columns(2)
         with col_d1:
@@ -412,9 +496,9 @@ if submit:
             )
         with col_d2:
             st.download_button(
-                label="📄 DOWNLOAD HALAMAN DEPAN PDF (F4)",
-                data=pdf_bytes,
-                file_name=f"PENGANTAR_NIKAH_F4_{nama_lk}.pdf".replace(" ", "_"),
+                label="📄 DOWNLOAD PDF ISIAN DATA (UKURAN F4)",
+                data=output_pdf,
+                file_name=f"ISIAN_DATA_F4_{nama_lk}.pdf".replace(" ", "_"),
                 mime="application/pdf",
                 use_container_width=True
             )
