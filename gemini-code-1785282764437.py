@@ -32,85 +32,99 @@ NAMA_HARI = {
     "Sunday": "Minggu"
 }
 
-# FUNGSI MEMBUAT PDF REKAP ISIAN DATA (1 HALAMAN)
+# FUNGSI MEMBUAT PDF REKAP ISIAN DATA (FONT MAKSIMAL 1 HALAMAN FULL)
 def generate_pdf_rekap(data_dict):
     buffer = BytesIO()
+    
+    # Margin diperkecil (10pt ~ 3.5mm) agar area cetak maksimal
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        leftMargin=20,
-        rightMargin=20,
-        topMargin=20,
-        bottomMargin=20
+        leftMargin=10,
+        rightMargin=10,
+        topMargin=12,
+        bottomMargin=12
     )
     
     styles = getSampleStyleSheet()
     
-    # Custom Styles
+    # Custom Styles diperbesar
     style_title = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=12,
-        leading=14,
+        fontSize=13,
+        leading=15,
         alignment=1, # Center
         fontName='Helvetica-Bold',
-        spaceAfter=4
+        textColor=colors.HexColor('#0f172a'),
+        spaceAfter=2
+    )
+    
+    style_sub = ParagraphStyle(
+        'SubTitleStyle',
+        parent=styles['Normal'],
+        fontSize=9.5,
+        leading=11,
+        alignment=1,
+        fontName='Helvetica-Bold',
+        textColor=colors.HexColor('#334155')
     )
     
     style_section = ParagraphStyle(
         'SecStyle',
         parent=styles['Normal'],
-        fontSize=8,
-        leading=10,
+        fontSize=9,
+        leading=11,
         fontName='Helvetica-Bold',
-        textColor=colors.HexColor('#1a365d')
+        textColor=colors.HexColor('#1e3a8a')
     )
     
-    style_cell_label = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=7, leading=8, fontName='Helvetica-Bold')
-    style_cell_val = ParagraphStyle('ValStyle', parent=styles['Normal'], fontSize=7, leading=8, fontName='Helvetica')
+    # Ukuran font isi tabel diperbesar ke 8.5pt (sangat jelas terbaca)
+    style_cell_label = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica-Bold', textColor=colors.HexColor('#1e293b'))
+    style_cell_val = ParagraphStyle('ValStyle', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica', textColor=colors.HexColor('#0f172a'))
     
     elements = []
     
     # Judul Header PDF
     elements.append(Paragraph("REKAP ISIAN DATA BERKAS CATIN DESA TAMBI", style_title))
-    elements.append(Paragraph(f"No. Register: {data_dict.get('G2','')} | Tanggal Surat: {data_dict.get('H3','')}", ParagraphStyle('Sub', parent=styles['Normal'], fontSize=8, alignment=1, leading=10)))
+    elements.append(Paragraph(f"<b>No. Register:</b> {data_dict.get('G2','')} &nbsp;|&nbsp; <b>Tanggal Surat:</b> {data_dict.get('H3','')}", style_sub))
     elements.append(Spacer(1, 6))
     
-    # Data Tabel Rapi 2 Kolom (Sisi Kiri & Sisi Kanan) untuk muat 1 Lembar
     def make_p(txt, is_label=False):
         st_use = style_cell_label if is_label else style_cell_val
         return Paragraph(str(txt) if txt else "-", st_use)
 
+    # Struktur Tabel Rapi & Padat
     table_data = [
-        # SECTION 1: PELAKSANAAN AKAD
-        [Paragraph("<b>--- 1. PELAKSANAAN AKAD NIKAH ---</b>", style_section), "", Paragraph("<b>--- 2. CATIN LAKI-LAKI ---</b>", style_section), ""],
-        [make_p("Tgl / Hari Akad", True), make_p(f"{data_dict.get('G4','')} ({data_dict.get('I4','')})"), make_p("Nama / Bin", True), make_p(f"{data_dict.get('G8','')} bin {data_dict.get('G9','')}")],
+        # SECTION 1: PELAKSANAAN AKAD & CATIN LK
+        [Paragraph("1. PELAKSANAAN AKAD NIKAH", style_section), "", Paragraph("2. CATIN LAKI-LAKI", style_section), ""],
+        [make_p("Hari / Tgl Akad", True), make_p(f"{data_dict.get('I4','')} / {data_dict.get('G4','')}"), make_p("Nama / Bin", True), make_p(f"{data_dict.get('G8','')} bin {data_dict.get('G9','')}")],
         [make_p("Jam / Tempat", True), make_p(f"{data_dict.get('G5','')} @ {data_dict.get('G6','')}"), make_p("NIK / TTL", True), make_p(f"{data_dict.get('G11','')} / {data_dict.get('G10','')} ({data_dict.get('K10','')} th)")],
         [make_p("Mahar", True), make_p(data_dict.get('G65','')), make_p("Pekerjaan / Status", True), make_p(f"{data_dict.get('G12','')} / {data_dict.get('G13','')}")],
-        [make_p("Email / Pendidikan LK", True), make_p(data_dict.get('G17','')), make_p("Alamat LK", True), make_p(data_dict.get('G16',''))],
+        [make_p("Pendidikan LK", True), make_p(data_dict.get('G17','')), make_p("Alamat LK", True), make_p(data_dict.get('G16',''))],
         
-        # SECTION 3: ORTU LAKI-LAKI
-        [Paragraph("<b>--- 3. AYAH & IBU CATIN LAKI-LAKI ---</b>", style_section), "", Paragraph("<b>--- 4. CATIN PEREMPUAN ---</b>", style_section), ""],
-        [make_p("Ayah LK (NIK/TTL)", True), make_p(f"{data_dict.get('G19','')} bin {data_dict.get('J19','')} ({data_dict.get('G20','')})"), make_p("Nama / Binti", True), make_p(f"{data_dict.get('G34','')} binti {data_dict.get('G35','')}")],
-        [make_p("Pekerjaan / Alamat", True), make_p(f"{data_dict.get('G22','')} / {data_dict.get('G23','')}"), make_p("NIK / TTL", True), make_p(f"{data_dict.get('G37','')} / {data_dict.get('G36','')} ({data_dict.get('K36','')} th)")],
-        [make_p("Ibu LK (NIK/TTL)", True), make_p(f"{data_dict.get('G26','')} bin {data_dict.get('I26','')} ({data_dict.get('G27','')})"), make_p("Pekerjaan / Status", True), make_p(f"{data_dict.get('G38','')} / {data_dict.get('G39','')}")],
-        [make_p("Pekerjaan / Alamat", True), make_p(f"{data_dict.get('G29','')} / {data_dict.get('G30','')}"), make_p("Alamat PR", True), make_p(data_dict.get('G41',''))],
+        # SECTION 2: ORTU LAKI-LAKI & CATIN PR
+        [Paragraph("3. AYAH & IBU CATIN LAKI-LAKI", style_section), "", Paragraph("4. CATIN PEREMPUAN", style_section), ""],
+        [make_p("Ayah LK", True), make_p(f"{data_dict.get('G19','')} bin {data_dict.get('J19','')} ({data_dict.get('G20','')})"), make_p("Nama / Binti", True), make_p(f"{data_dict.get('G34','')} binti {data_dict.get('G35','')}")],
+        [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G22','')} / {data_dict.get('G23','')}"), make_p("NIK / TTL", True), make_p(f"{data_dict.get('G37','')} / {data_dict.get('G36','')} ({data_dict.get('K36','')} th)")],
+        [make_p("Ibu LK", True), make_p(f"{data_dict.get('G26','')} bin {data_dict.get('I26','')} ({data_dict.get('G27','')})"), make_p("Pekerjaan / Status", True), make_p(f"{data_dict.get('G38','')} / {data_dict.get('G39','')}")],
+        [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G29','')} / {data_dict.get('G30','')}"), make_p("Alamat PR", True), make_p(data_dict.get('G41',''))],
 
-        # SECTION 5: ORTU PEREMPUAN
-        [Paragraph("<b>--- 5. AYAH & IBU CATIN PEREMPUAN ---</b>", style_section), "", Paragraph("<b>--- 6. DATA WALI NIKAH ---</b>", style_section), ""],
-        [make_p("Ayah PR (NIK/TTL)", True), make_p(f"{data_dict.get('G45','')} bin {data_dict.get('I45','')} ({data_dict.get('G46','')})"), make_p("Nama Wali", True), make_p(f"{data_dict.get('G68','')} ({data_dict.get('G64','')})")],
-        [make_p("Pekerjaan / Alamat", True), make_p(f"{data_dict.get('G48','')} / {data_dict.get('G49','')}"), make_p("NIK / TTL / Umur", True), make_p(f"{data_dict.get('G60','')} / {data_dict.get('G61','')} ({data_dict.get('K61','')} th)")],
-        [make_p("Ibu PR (NIK/TTL)", True), make_p(f"{data_dict.get('G52','')} bin {data_dict.get('I52','')} ({data_dict.get('G53','')})"), make_p("Pekerjaan / Alamat", True), make_p(f"{data_dict.get('G62','')} / {data_dict.get('G63','')}")],
-        [make_p("Pekerjaan / Alamat", True), make_p(f"{data_dict.get('G55','')} / {data_dict.get('G56','')}"), make_p("Mahar", True), make_p(data_dict.get('G65',''))],
+        # SECTION 3: ORTU PEREMPUAN & DATA WALI
+        [Paragraph("5. AYAH & IBU CATIN PEREMPUAN", style_section), "", Paragraph("6. DATA WALI NIKAH", style_section), ""],
+        [make_p("Ayah PR", True), make_p(f"{data_dict.get('G45','')} bin {data_dict.get('I45','')} ({data_dict.get('G46','')})"), make_p("Nama Wali", True), make_p(f"{data_dict.get('G68','')} ({data_dict.get('G64','')})")],
+        [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G48','')} / {data_dict.get('G49','')}"), make_p("NIK / TTL / Umur", True), make_p(f"{data_dict.get('G60','')} / {data_dict.get('G61','')} ({data_dict.get('K61','')} th)")],
+        [make_p("Ibu PR", True), make_p(f"{data_dict.get('G52','')} bin {data_dict.get('I52','')} ({data_dict.get('G53','')})"), make_p("Pekerjaan / Alamat", True), make_p(f"{data_dict.get('G62','')} / {data_dict.get('G63','')}")],
+        [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G55','')} / {data_dict.get('G56','')}"), make_p("Mahar", True), make_p(data_dict.get('G65',''))],
 
-        # SECTION 7: DATA SAKSI
-        [Paragraph("<b>--- 7. SAKSI 1 & SAKSI 2 ---</b>", style_section), "", "", ""],
+        # SECTION 4: DATA SAKSI 1 & 2
+        [Paragraph("7. SAKSI 1 & SAKSI 2", style_section), "", "", ""],
         [make_p("Saksi 1", True), make_p(f"{data_dict.get('G70','')} | NIK: {data_dict.get('G72','')} | TTL: {data_dict.get('G71','')} ({data_dict.get('K71','')} th) | Pekerjaan: {data_dict.get('G73','')} | Alamat: {data_dict.get('G74','')}")],
         [make_p("Saksi 2", True), make_p(f"{data_dict.get('G76','')} | NIK: {data_dict.get('G78','')} | TTL: {data_dict.get('G77','')} | Pekerjaan: {data_dict.get('G79','')} | Alamat: {data_dict.get('G80','')}")],
     ]
     
-    # Formatter layout tabel
-    t = Table(table_data, colWidths=[95, 180, 95, 185])
+    # Lebar total tabel diperbesar penuh A4 (575pt)
+    t = Table(table_data, colWidths=[100, 187, 100, 188])
     t.setStyle(TableStyle([
         ('SPAN', (0,0), (1,0)),
         ('SPAN', (2,0), (3,0)),
@@ -121,12 +135,21 @@ def generate_pdf_rekap(data_dict):
         ('SPAN', (0,15), (3,15)),
         ('SPAN', (1,16), (3,16)),
         ('SPAN', (1,17), (3,17)),
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#fafafa')),
-        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
-        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.HexColor('#e2e8f0')),
-        ('TOPPADDING', (0,0), (-1,-1), 2),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#94a3b8')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('TOPPADDING', (0,0), (-1,-1), 3.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('RIGHTPADDING', (0,0), (-1,-1), 4),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BACKGROUND', (0,0), (1,0), colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (2,0), (3,0), colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (0,5), (1,5), colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (2,5), (3,5), colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (0,10), (1,10), colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (2,10), (3,10), colors.HexColor('#e2e8f0')),
+        ('BACKGROUND', (0,15), (3,15), colors.HexColor('#e2e8f0')),
     ]))
     
     elements.append(t)
@@ -307,7 +330,7 @@ if submit:
             'G2': no_register,
             'H3': tgl_surat,
             'G4': tgl_pelaksanaan.strftime('%Y-%m-%d'),
-            'I4': hari_akad,  # Otomatis terisi nama hari
+            'I4': hari_akad,
             'G5': jam_akad,
             'G6': tempat_akad,
             'G8': nama_lk,
@@ -392,7 +415,7 @@ if submit:
         wb.save(output_excel)
         output_excel.seek(0)
 
-        # Generate PDF 1 Halaman dari data
+        # Generate PDF
         output_pdf = generate_pdf_rekap(cell_updates)
 
         st.success("✅ Success! Data berhasil diisikan ke sheet ISIAN DATA. Semua rumus antar sheet tetap bekerja 100% sempurna.")
@@ -409,7 +432,7 @@ if submit:
             )
         with col_dl2:
             st.download_button(
-                label="📄 Download Rekap Isian Data (PDF 1 Lembar)",
+                label="📄 Download Rekap Isian Data (PDF 1 Lembar Full)",
                 data=output_pdf,
                 file_name=f"REKAP_ISIAN_DATA_{filename_base}.pdf",
                 mime="application/pdf"
