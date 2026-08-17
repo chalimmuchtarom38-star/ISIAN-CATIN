@@ -1,486 +1,423 @@
 import streamlit as st
 import openpyxl
-import io
-import re
-import gc
-from datetime import datetime
+from io import BytesIO
+from datetime import datetime, date
 
-# Impor reportlab secara aman
-HAS_REPORTLAB = True
-try:
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-except Exception:
-    HAS_REPORTLAB = False
+# Library untuk Pembuatan PDF Ukuran F4
+from reportlab.lib.pagesizes import landscape
+from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
-st.set_page_config(page_title="Form Input Data Catin", page_icon="📝", layout="centered")
+# Ukuran Kertas F4 dalam Points (215.9 mm x 330 mm)
+F4_WIDTH = 215.9 * 2.83465
+F4_HEIGHT = 330.0 * 2.83465
+F4_SIZE = (F4_WIDTH, F4_HEIGHT)
 
-st.title("📝 Form Pengisian Data Catin")
-st.write("Isi formulir di bawah ini. Download **Excel Utuh (Master 100%)** atau **PDF Isian Data (Full Halaman F4)**.")
+st.set_page_config(
+    page_title="Aplikasi Berkas Catin - Desa Tambi",
+    page_icon="📜",
+    layout="wide"
+)
 
-EXCEL_MASTER = "N SUSILAH RT 010 RW 002.xlsx"
+st.title("📜 Form Input Berkas Catin Desa Tambi")
+st.caption("Mengisi sheet 'ISIAN DATA' tanpa merusak rumus. Menyediakan unduhan Excel utuh & PDF Surat Pengantar (F4).")
 
-@st.cache_resource(show_spinner=False)
-def load_master_bytes():
-    with open(EXCEL_MASTER, "rb") as f:
-        return f.read()
+EXCEL_FILE = "BERKAS CATIN .xlsx"
 
-def hitung_umur(ttl_text):
-    if not ttl_text:
-        return ""
-    match = re.search(r'\b(19\d\d|20\d\d)\b', str(ttl_text))
-    if match:
-        tahun_lahir = int(match.group(1))
-        tahun_sekarang = datetime.now().year
-        umur = tahun_sekarang - tahun_lahir
-        return umur if umur >= 0 else ""
-    return ""
-
-def get_nama_hari(tgl_obj):
-    if not tgl_obj:
-        return ""
-    hari_dict = {
-        'Monday': 'Senin',
-        'Tuesday': 'Selasa',
-        'Wednesday': 'Rabu',
-        'Thursday': 'Kamis',
-        'Friday': 'Jumat',
-        'Saturday': 'Sabtu',
-        'Sunday': 'Minggu'
-    }
-    english_day = tgl_obj.strftime('%A')
-    return hari_dict.get(english_day, english_day)
-
-def validasi_nik(nik, label):
-    nik_str = str(nik).strip()
-    if not nik_str.isdigit():
-        return f"❌ {label} harus berupa angka saja!"
-    if len(nik_str) != 16:
-        return f"❌ {label} harus tepat 16 digit! (Saat ini: {len(nik_str)} digit)"
-    return None
-
-def generate_pdf_isian_data(data_dict, tgl_surat_val):
-    if not HAS_REPORTLAB:
-        return None
+# --------------------------------------------------
+# FORMULIR INPUT DATA
+# --------------------------------------------------
+with st.form("form_catin"):
     
-    try:
-        buffer = io.BytesIO()
-        # Ukuran F4 dalam point: 612 x 936
-        f4_size = (612, 936) 
-        
-        # Margin atas/bawah diperkecil (10pt) agar pemanfaatan kertas penuh sampai bawah
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=f4_size,
-            rightMargin=18,
-            leftMargin=18,
-            topMargin=10,
-            bottomMargin=10
-        )
-        
-        styles = getSampleStyleSheet()
-        
-        title_style = ParagraphStyle(
-            'TitleStyle',
-            parent=styles['Heading1'],
-            fontSize=11,
-            alignment=1,
-            spaceAfter=4,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor("#1A365D")
-        )
-        
-        section_style = ParagraphStyle(
-            'SectionStyle',
-            parent=styles['Heading2'],
-            fontSize=8,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor("#1A365D"),
-            spaceBefore=0,
-            spaceAfter=0
-        )
-        
-        cell_label_style = ParagraphStyle('CellLabel', fontSize=7.2, fontName='Helvetica-Bold', leading=8.5, textColor=colors.HexColor("#2D3748"))
-        cell_val_style = ParagraphStyle('CellVal', fontSize=7.2, fontName='Helvetica', leading=8.5, textColor=colors.HexColor("#1A202C"))
-        
-        ttd_text_style = ParagraphStyle('TTDText', fontSize=8.5, fontName='Helvetica', alignment=1, leading=10)
-        ttd_nama_style = ParagraphStyle('TTDNama', fontSize=9, fontName='Helvetica-Bold', alignment=1, leading=10)
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📝 Register & Akad",
+        "👨 Catin Laki-Laki & Ortu",
+        "👩 Catin Perempuan & Ortu",
+        "🤝 Data Wali",
+        "👥 Data Saksi 1 & 2"
+    ])
+    
+    # --- TAB 1: REGISTER & AKAD ---
+    with tab1:
+        st.subheader("Surat & Pelaksanaan Akad Nikah")
+        col1, col2 = st.columns(2)
+        with col1:
+            no_register = st.text_input("Nomor Register", value="400.12.3.2/010/ VIII/ 2026")
+            tgl_surat = st.text_input("Tanggal Surat", value="TAMBI, 11 AGUSTUS 2026")
+            tgl_pelaksanaan = st.date_input("Tanggal Pelaksanaan Akad", value=date(2026, 9, 7))
+            jam_akad = st.text_input("Jam Akad", value="JAM. 08.00")
+        with col2:
+            tempat_akad = st.text_input("Tempat Akad Nikah", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
+            email_catin = st.text_input("Email Catin", value="")
+            mahar = st.text_input("Maskawin / Mahar", value="Seperangkat Alat Sholat")
 
-        story = []
-        story.append(Paragraph("<b>LEMBAR ISIAN DATA CATIN & PELAKSANAAN AKAD</b>", title_style))
+    # --- TAB 2: CATIN LAKI-LAKI & ORTU ---
+    with tab2:
+        st.subheader("Data Calon Pengantin Laki-Laki")
+        col_lk1, col_lk2 = st.columns(2)
+        with col_lk1:
+            nama_lk = st.text_input("Nama Calon Pengantin Laki-Laki", value="MIfahul Anam")
+            bin_lk = st.text_input("Bin (Ayah Laki-Laki)", value="Nur Karim")
+            ttl_lk = st.text_input("Tempat, Tanggal Lahir Laki-Laki", value="Pemalang, 18 Februari 1999")
+            umur_lk = st.number_input("Umur Laki-Laki", value=27)
+            nik_lk = st.text_input("NIK Laki-Laki", value="3327031802990004")
+        with col_lk2:
+            pekerjaan_lk = st.text_input("Pekerjaan Laki-Laki", value="Swasta")
+            status_lk = st.text_input("Status Laki-Laki", value="BELUM KAWIN")
+            jk_lk = st.text_input("Jenis Kelamin Laki-Laki", value="Laki-Laki")
+            istri_terdahulu = st.text_input("Nama Istri Terdahulu (Jika ada)", value="")
+            alamat_lk = st.text_area("Alamat Laki-Laki", value="RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang")
+            pendidikan_lk = st.text_input("Pendidikan Laki-Laki", value="SLTA")
 
-        table_data = []
-        # Padding dinaikkan sedikit (1.8) agar tinggi tabel mengisi ruang vertikal dengan pas
-        t_style = [
-            ('BACKGROUND', (0,0), (-1,-1), colors.white),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 1.8),
-            ('TOPPADDING', (0,0), (-1,-1), 1.8),
-            ('LEFTPADDING', (0,0), (-1,-1), 5),
-            ('RIGHTPADDING', (0,0), (-1,-1), 5),
-            ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#CBD5E0")),
-        ]
+        st.divider()
+        st.subheader("Data Ayah & Ibu Laki-Laki")
+        col_alk, col_ilk = st.columns(2)
+        with col_alk:
+            st.markdown("**Ayah Laki-Laki**")
+            nama_ayah_lk = st.text_input("Nama Ayah Laki-Laki", value="Nur Karim")
+            bin_ayah_lk = st.text_input("bin (Kakek Laki-Laki)", value="Kasturi")
+            nik_ayah_lk = st.text_input("NIK Ayah Laki-Laki", value="3327030608680006")
+            ttl_ayah_lk = st.text_input("TTL Ayah Laki-Laki", value="Pemalang, 06 Agustus 1968")
+            umur_ayah_lk = st.number_input("Umur Ayah Laki-Laki", value=58)
+            pekerjaan_ayah_lk = st.text_input("Pekerjaan Ayah Laki-Laki", value="PETANI/ PEKEBUN")
+            alamat_ayah_lk = st.text_area("Alamat Ayah Laki-Laki", value="RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang")
 
-        row_idx = 0
-        for section, fields in data_dict.items():
-            sec_p = Paragraph(f"<b>{section.upper()}</b>", section_style)
-            table_data.append([sec_p, ""])
-            t_style.append(('SPAN', (0, row_idx), (1, row_idx)))
-            t_style.append(('BACKGROUND', (0, row_idx), (1, row_idx), colors.HexColor("#E2E8F0")))
-            row_idx += 1
-            
-            for k, v in fields.items():
-                p_k = Paragraph(k, cell_label_style)
-                p_v = Paragraph(str(v) if v else "-", cell_val_style)
-                table_data.append([p_k, p_v])
-                row_idx += 1
+        with col_ilk:
+            st.markdown("**Ibu Laki-Laki**")
+            nama_ibu_lk = st.text_input("Nama Ibu Laki-Laki", value="Samijah")
+            bin_ibu_lk = st.text_input("bin (Kakek Ibu Laki-Laki)", value="Taryad")
+            nik_ibu_lk = st.text_input("NIK Ibu Laki-Laki", value="3327035405740004")
+            ttl_ibu_lk = st.text_input("TTL Ibu Laki-Laki", value="Pemalang, 14 Mei 1974")
+            umur_ibu_lk = st.number_input("Umur Ibu Laki-Laki", value=52)
+            pekerjaan_ibu_lk = st.text_input("Pekerjaan Ibu Laki-Laki", value="Mengurus Rumah Tangga")
+            alamat_ibu_lk = st.text_area("Alamat Ibu Laki-Laki", value="RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang")
 
-        t = Table(table_data, colWidths=[150, 426])
-        t.setStyle(TableStyle(t_style))
-        story.append(t)
-        
-        # Pendorong tabel TTD lebih ke bawah
-        story.append(Spacer(1, 20))
-        
-        # Format Tanggal TTD
-        tgl_clean = tgl_surat_val.upper().replace('TAMBI,', '').strip()
-        if not tgl_clean:
-            tgl_clean = datetime.now().strftime("%d %B %Y")
-            
-        # Blok Tanda Tangan
-        ttd_data = [
-            ["", Paragraph(f"Tambi, {tgl_clean}", ttd_text_style)],
-            ["", Paragraph("Pengantar / Kasi Pelayanan", ttd_text_style)],
-            ["", Spacer(1, 50)], # Ruang TTD diperlebar agar posisi persis berada di bawah kertas
-            ["", Paragraph("<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>", ttd_nama_style)]
-        ]
-        
-        ttd_table = Table(ttd_data, colWidths=[340, 236])
-        ttd_table.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('ALIGN', (1,0), (1,-1), 'CENTER'),
-            ('LEFTPADDING', (0,0), (-1,-1), 0),
-            ('RIGHTPADDING', (0,0), (-1,-1), 0),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 1),
-            ('TOPPADDING', (0,0), (-1,-1), 1),
-        ]))
-        
-        story.append(ttd_table)
-        
-        doc.build(story)
-        buffer.seek(0)
-        return buffer
-    except Exception as e:
-        st.error(f"⚠️ Gagal membuat PDF: {e}")
-        return None
+    # --- TAB 3: CATIN PEREMPUAN & ORTU ---
+    with tab3:
+        st.subheader("Data Calon Pengantin Perempuan")
+        col_pr1, col_pr2 = st.columns(2)
+        with col_pr1:
+            nama_pr = st.text_input("Nama Calon Pengantin Perempuan", value="Diyan Solehatin")
+            binti_pr = st.text_input("Binti (Ayah Perempuan)", value="Disun")
+            ttl_pr = st.text_input("Tempat, Tanggal Lahir Perempuan", value="Pemalang, 29 Juni 2007")
+            umur_pr = st.number_input("Umur Perempuan", value=19)
+            nik_pr = st.text_input("NIK Perempuan", value="3327046906070010")
+        with col_pr2:
+            pekerjaan_pr = st.text_input("Pekerjaan Perempuan", value="BELUM/ TIDAK BEKERJA")
+            status_pr = st.text_input("Status Perempuan", value="BELUM KAWIN")
+            jk_pr = st.text_input("Jenis Kelamin Perempuan", value="PEREMPUAN")
+            suami_terdahulu = st.text_input("Nama Suami Terdahulu (Jika ada)", value="")
+            alamat_pr = st.text_area("Alamat Perempuan", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
+            pendidikan_pr = st.text_input("Pendidikan Perempuan", value="SLTP")
 
-try:
-    master_bytes = load_master_bytes()
-except Exception as e:
-    st.error(f"⚠️ Gagal membaca file master Excel '{EXCEL_MASTER}'. Pastikan file berada di folder yang sama dengan app.py! Error: {e}")
-    st.stop()
+        st.divider()
+        st.subheader("Data Ayah & Ibu Perempuan")
+        col_apr, col_ipr = st.columns(2)
+        with col_apr:
+            st.markdown("**Ayah Perempuan**")
+            nama_ayah_pr = st.text_input("Nama Ayah Perempuan", value="Disun")
+            bin_ayah_pr = st.text_input("bin (Kakek Perempuan)", value="Tawiroji")
+            nik_ayah_pr = st.text_input("NIK Ayah Perempuan", value="3327042504840003")
+            ttl_ayah_pr = st.text_input("TTL Ayah Perempuan", value="Pemalang, 21 April 1984")
+            umur_ayah_pr = st.number_input("Umur Ayah Perempuan", value=42)
+            pekerjaan_ayah_pr = st.text_input("Pekerjaan Ayah Perempuan", value="PETANI/ PEKEBUN")
+            alamat_ayah_pr = st.text_area("Alamat Ayah Perempuan", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
-with st.form("catin_form"):
-    st.header("📌 1. Data Surat & Pelaksanaan")
-    no_register = st.text_input("Nomor Register", "400.12.3.2/007/ VII/ 2026")
-    tgl_surat = st.text_input("Tanggal Surat / Terbit Lembaran", "TAMBI, 29 JULI 2026")
-    tgl_pelaksanaan = st.date_input("Tanggal Pelaksanaan Akad")
-    jam_pelaksanaan = st.text_input("Jam Pelaksanaan", "JAM. 08.00")
-    tempat_akad = st.text_area("Tempat Akad Nikah", "DI RUMAH MEMPELAI PUTRI RT 010 RW 002 DESA TAMBI WATUKUMPUL PEMALANG")
+        with col_ipr:
+            st.markdown("**Ibu Perempuan**")
+            nama_ibu_pr = st.text_input("Nama Ibu Perempuan", value="Mutirah")
+            bin_ibu_pr = st.text_input("bin (Kakek Ibu Perempuan)", value="Tamiarjo")
+            nik_ibu_pr = st.text_input("NIK Ibu Perempuan", value="3327044411840003")
+            ttl_ibu_pr = st.text_input("TTL Ibu Perempuan", value="Pemalang, 04 November 1984")
+            umur_ibu_pr = st.number_input("Umur Ibu Perempuan", value=42)
+            pekerjaan_ibu_pr = st.text_input("Pekerjaan Ibu Perempuan", value="Mengurus Rumah Tangga")
+            alamat_ibu_pr = st.text_area("Alamat Ibu Perempuan", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
-    st.markdown("---")
-    st.header("👨 2. Calon Pengantin Laki-Laki")
-    pria_nama = st.text_input("Nama Laki-Laki", "SAEFULOH")
-    pria_bin = st.text_input("BIN (Ayah Laki-Laki)", "KUNENI")
-    pria_ttl = st.text_input("Tempat Tanggal Lahir (Pria)", "PURBALINGGA , 07 APRIL 2000")
-    pria_nik = st.text_input("NIK (Pria)", "3303170704000001", max_chars=16)
-    pria_pekerjaan = st.text_input("Pekerjaan (Pria)", "KARYAWAN SWASTA")
-    pria_status = st.selectbox("Status (Pria)", ["BELUM KAWIN", "DUDA"], index=0)
-    pria_pendidikan = st.text_input("Pendidikan (Pria)", "SLTA")
-    pria_alamat = st.text_area("Alamat (Pria)", "RT 004 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
+    # --- TAB 4: DATA WALI ---
+    with tab4:
+        st.subheader("Data Wali Nikah")
+        col_w1, col_w2 = st.columns(2)
+        with col_w1:
+            nama_wali = st.text_input("Nama Wali", value="Disun")
+            bin_wali = st.text_input("Bin Wali", value="Tawiroji")
+            nik_wali = st.text_input("NIK Wali", value="3327042504840003")
+            ttl_wali = st.text_input("TTL Wali", value="PEMALANG, 21 April 1984")
+            umur_wali = st.number_input("Umur Wali", value=42)
+        with col_w2:
+            pekerjaan_wali = st.text_input("Pekerjaan Wali", value="PETANI/ PEKEBUN")
+            alamat_wali = st.text_area("Alamat Wali", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
+            hubungan_wali = st.text_input("Hubungan Wali", value="AYAH KANDUNG")
+            nama_wali_lengkap = st.text_input("Nama Wali Lengkap", value="Disun Bin Tawiroji")
 
-    st.subheader("👴 Data Ayah Laki-Laki")
-    ayah_pria_nama = st.text_input("Nama Ayah Laki-Laki", "KUNENI")
-    ayah_pria_bin = st.text_input("BIN Ayah Laki-Laki", "SANBISRI")
-    ayah_pria_nik = st.text_input("NIK Ayah Laki-Laki", "3303170406740001", max_chars=16)
-    ayah_pria_ttl = st.text_input("TTL Ayah Laki-Laki", "PURBALINGGA, 04 JUNI 1974")
-    ayah_pria_pekerjaan = st.text_input("Pekerjaan Ayah Laki-Laki", "PETANI/ PEKEBUN")
-    ayah_pria_alamat = st.text_area("Alamat Ayah Laki-Laki", "RT 004 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
+    # --- TAB 5: DATA SAKSI 1 & 2 ---
+    with tab5:
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            st.subheader("Data Saksi 1")
+            saksi1_nama = st.text_input("Nama Saksi 1", value="Chalim Muchtarom")
+            saksi1_ttl = st.text_input("TTL Saksi 1", value="Pemalang, 21 Oktober 1989")
+            saksi1_umur = st.number_input("Umur Saksi 1", value=37)
+            saksi1_nik = st.text_input("NIK Saksi 1", value="3327042110890004")
+            saksi1_pekerjaan = st.text_input("Pekerjaan Saksi 1", value="Perangkat Desa")
+            saksi1_alamat = st.text_area("Alamat Saksi 1", value="RT 002 RW 001 Desa Tambi Kecamatan Watukumpu Kabupaten Pemalang")
 
-    st.subheader("👵 Data Ibu Laki-Laki")
-    ibu_pria_nama = st.text_input("Nama Ibu Laki-Laki", "DARYATI")
-    ibu_pria_bin = st.text_input("BIN Ibu Laki-Laki", "SUMIARTO")
-    ibu_pria_nik = st.text_input("NIK Ibu Laki-Laki", "3303174705800003", max_chars=16)
-    ibu_pria_ttl = st.text_input("TTL Ibu Laki-Laki", "PURBALINGGA, 07 JUNI 1980")
-    ibu_pria_pekerjaan = st.text_input("Pekerjaan Ibu Laki-Laki", "Mengurus Rumah Tangga")
-    ibu_pria_alamat = st.text_area("Alamat Ibu Laki-Laki", "RT 004 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
+        with col_s2:
+            st.subheader("Data Saksi 2")
+            saksi2_nama = st.text_input("Nama Saksi 2", value="Sidin")
+            saksi2_ttl = st.text_input("TTL Saksi 2", value="Pemalang, ")
+            saksi2_nik = st.text_input("NIK Saksi 2", value="0000000000000000")
+            saksi2_pekerjaan = st.text_input("Pekerjaan Saksi 2", value="")
+            saksi2_alamat = st.text_area("Alamat Saksi 2", value="")
 
-    st.markdown("---")
-    st.header("👩 3. Calon Pengantin Perempuan")
-    wanita_nama = st.text_input("Nama Perempuan", "SUSILAH")
-    wanita_binti = st.text_input("BINTI (Ayah Perempuan)", "RUSMAN")
-    wanita_ttl = st.text_input("Tempat Tanggal Lahir (Perempuan)", "PEMALANG, 11 SEPTEMBER 1999")
-    wanita_nik = st.text_input("NIK (Perempuan)", "3327045109990007", max_chars=16)
-    wanita_pekerjaan = st.text_input("Pekerjaan (Perempuan)", "BELUM/ TIDAK BEKERJA")
-    wanita_status = st.selectbox("Status (Perempuan)", ["BELUM KAWIN", "JANDA"], index=0)
-    wanita_pendidikan = st.text_input("Pendidikan (Perempuan)", "SLTA")
-    wanita_alamat = st.text_area("Alamat (Perempuan)", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    submit = st.form_submit_button("💾 PROSES DATA & GENERATE BERKAS")
 
-    st.subheader("👴 Data Ayah Perempuan")
-    ayah_wanita_nama = st.text_input("Nama Ayah Perempuan", "RUSMAN")
-    ayah_wanita_bin = st.text_input("BIN Ayah Perempuan", "MARTA")
-    ayah_wanita_nik = st.text_input("NIK Ayah Perempuan", "3327040107740063", max_chars=16)
-    ayah_wanita_ttl = st.text_input("TTL Ayah Perempuan", "PEMALANG, 01 JULI 1974")
-    ayah_wanita_pekerjaan = st.text_input("Pekerjaan Ayah Perempuan", "PETANI/ PEKEBUN")
-    ayah_wanita_alamat = st.text_area("Alamat Ayah Perempuan", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
 
-    st.subheader("👵 Data Ibu Perempuan")
-    ibu_wanita_nama = st.text_input("Nama Ibu Perempuan", "KHOSINGAH")
-    ibu_wanita_bin = st.text_input("BIN Ibu Perempuan", "NASIR")
-    ibu_wanita_nik = st.text_input("NIK Ibu Perempuan", "3327044107810112", max_chars=16)
-    ibu_wanita_ttl = st.text_input("TTL Ibu Perempuan", "PEMALANG 01 JULI 1981")
-    ibu_wanita_pekerjaan = st.text_input("Pekerjaan Ibu Perempuan", "Mengurus Rumah Tangga")
-    ibu_wanita_alamat = st.text_area("Alamat Ibu Perempuan", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+# --------------------------------------------------
+# FUNGSI MEMBUAT PDF SURAT PENGANTAR HALAMAN DEPAN (UKURAN F4)
+# --------------------------------------------------
+def create_f4_pdf(data_dict):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=F4_SIZE,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    style_kop_head = ParagraphStyle('KopHead', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, alignment=1, leading=14)
+    style_kop_sub = ParagraphStyle('KopSub', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, alignment=1, leading=16)
+    style_title = ParagraphStyle('TitlePDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, alignment=1, leading=14)
+    style_body = ParagraphStyle('BodyPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=13)
+    style_bold = ParagraphStyle('BoldPDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, leading=13)
 
-    st.markdown("---")
-    st.header("🤝 4. Data Wali & Mahar")
-    wali_nama = st.text_input("Nama Wali", "RUSMAN")
-    wali_bin = st.text_input("BIN Wali", "MARTA")
-    wali_nik = st.text_input("NIK Wali", "3327040107740063", max_chars=16)
-    wali_ttl = st.text_input("TTL Wali", "PEMALANG, 01 JULI 1974")
-    wali_pekerjaan = st.text_input("Pekerjaan Wali", "PETANI/ PEKEBUN")
-    wali_alamat = st.text_area("Alamat Wali", "RT 002 RW 004 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
-    wali_hubungan = st.text_input("Hubungan Wali", "AYAH KANDUNG")
-    mahar = st.text_input("Mahar / Maskawin", "Seperangkat Alat Sholat")
-    nama_lengkap_wali_b68 = st.text_input("Nama Wali Lengkap beserta BIN", "RUSMAN BIN MARTA")
+    elements = []
 
-    st.markdown("---")
-    st.header("📜 5. Data Saksi-Saksi")
-    st.subheader("👤 Saksi 1")
-    saksi1_nama = st.text_input("Nama Saksi 1", "JURI")
-    saksi1_ttl = st.text_input("TTL Saksi 1", "PEMALANG, 04 MEI 1966")
-    saksi1_nik = st.text_input("NIK Saksi 1", "3327040405660002", max_chars=16)
-    saksi1_pekerjaan = st.text_input("Pekerjaan Saksi 1", "KEPALA DESA")
-    saksi1_alamat = st.text_area("Alamat Saksi 1", "RT 010 RW 002 DESA TAMBI KECAMATAN WATUKUMPUL KABUPATEN PEMALANG")
+    # KOP SURAT
+    elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG", style_kop_head))
+    elements.append(Paragraph("KECAMATAN WATUKUMPUL", style_kop_head))
+    elements.append(Paragraph("DESA TAMBI", style_kop_sub))
+    elements.append(Spacer(1, 10))
 
-    st.subheader("👤 Saksi 2")
-    saksi2_nama = st.text_input("Nama Saksi 2", "GHOFUR")
-    saksi2_ttl = st.text_input("TTL Saksi 2", "PURBALINGGA, 10 FEBRUARI 1988")
-    saksi2_nik = st.text_input("NIK Saksi 2", "3303171002880003", max_chars=16)
-    saksi2_pekerjaan = st.text_input("Pekerjaan Saksi 2", "WIRASWASTA")
-    saksi2_alamat = st.text_area("Alamat Saksi 2", "RT 001 RW 001 DESA JINGKANG KECAMATAN KARANGJAMBU KABUPATEN PURBALINGGA")
+    # JUDUL SURAT
+    elements.append(Paragraph("<u>PENGANTAR NIKAH</u>", style_title))
+    elements.append(Paragraph(f"Nomor: {data_dict['no_register']}", style_title))
+    elements.append(Spacer(1, 12))
 
-    submitted = st.form_submit_button("💾 Proses Data & Siapkan Download")
+    elements.append(Paragraph("Yang bertanda tangan di bawah ini menjelaskan dengan sesungguhnya bahwa:", style_body))
+    elements.append(Spacer(1, 8))
 
-if submitted:
-    daftar_nik = [
-        (pria_nik, "NIK Catin Laki-Laki"),
-        (ayah_pria_nik, "NIK Ayah Laki-Laki"),
-        (ibu_pria_nik, "NIK Ibu Laki-Laki"),
-        (wanita_nik, "NIK Catin Perempuan"),
-        (ayah_wanita_nik, "NIK Ayah Perempuan"),
-        (ibu_wanita_nik, "NIK Ibu Perempuan"),
-        (wali_nik, "NIK Wali"),
-        (saksi1_nik, "NIK Saksi 1"),
-        (saksi2_nik, "NIK Saksi 2")
+    # TABLE DATA CATIN LAKI-LAKI
+    table_data = [
+        [Paragraph("1.", style_body), Paragraph("Nama Lengkap", style_body), Paragraph(":", style_body), Paragraph(data_dict['nama_lk'], style_bold)],
+        [Paragraph("2.", style_body), Paragraph("NIK", style_body), Paragraph(":", style_body), Paragraph(data_dict['nik_lk'], style_body)],
+        [Paragraph("3.", style_body), Paragraph("Jenis Kelamin", style_body), Paragraph(":", style_body), Paragraph(data_dict['jk_lk'], style_body)],
+        [Paragraph("4.", style_body), Paragraph("Tempat, Tgl Lahir", style_body), Paragraph(":", style_body), Paragraph(data_dict['ttl_lk'], style_body)],
+        [Paragraph("5.", style_body), Paragraph("Pekerjaan", style_body), Paragraph(":", style_body), Paragraph(data_dict['pekerjaan_lk'], style_body)],
+        [Paragraph("6.", style_body), Paragraph("Status Pernikahan", style_body), Paragraph(":", style_body), Paragraph(data_dict['status_lk'], style_body)],
+        [Paragraph("7.", style_body), Paragraph("Alamat", style_body), Paragraph(":", style_body), Paragraph(data_dict['alamat_lk'], style_body)],
     ]
 
-    errors = []
-    for nik_val, label in daftar_nik:
-        err = validasi_nik(nik_val, label)
-        if err:
-            errors.append(err)
+    t1 = Table(table_data, colWidths=[20, 130, 15, 380])
+    t1.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
+    elements.append(t1)
+    elements.append(Spacer(1, 10))
 
-    if errors:
-        for err in errors:
-            st.error(err)
-    else:
-        try:
-            wb = openpyxl.load_workbook(io.BytesIO(master_bytes))
-            ws = wb["ISIAN DATA"]
+    elements.append(Paragraph("Adalah benar-benar anak dari pernikahan seorang pria:", style_body))
+    elements.append(Spacer(1, 6))
 
-            u_pria = hitung_umur(pria_ttl)
-            u_ayah_pria = hitung_umur(ayah_pria_ttl)
-            u_ibu_pria = hitung_umur(ibu_pria_ttl)
-            u_wanita = hitung_umur(wanita_ttl)
-            u_ayah_wanita = hitung_umur(ayah_wanita_ttl)
-            u_ibu_wanita = hitung_umur(ibu_wanita_ttl)
-            u_wali = hitung_umur(wali_ttl)
-            u_saksi1 = hitung_umur(saksi1_ttl)
-            u_saksi2 = hitung_umur(saksi2_ttl)
-            
-            hari_akad = get_nama_hari(tgl_pelaksanaan)
+    # TABLE AYAH
+    table_ayah = [
+        [Paragraph("1.", style_body), Paragraph("Nama Ayah", style_body), Paragraph(":", style_body), Paragraph(f"{data_dict['nama_ayah_lk']} bin {data_dict['bin_ayah_lk']}", style_body)],
+        [Paragraph("2.", style_body), Paragraph("NIK Ayah", style_body), Paragraph(":", style_body), Paragraph(data_dict['nik_ayah_lk'], style_body)],
+        [Paragraph("3.", style_body), Paragraph("Tempat, Tgl Lahir", style_body), Paragraph(":", style_body), Paragraph(data_dict['ttl_ayah_lk'], style_body)],
+        [Paragraph("4.", style_body), Paragraph("Pekerjaan / Alamat", style_body), Paragraph(":", style_body), Paragraph(f"{data_dict['pekerjaan_ayah_lk']} / {data_dict['alamat_ayah_lk']}", style_body)],
+    ]
+    t2 = Table(table_ayah, colWidths=[20, 130, 15, 380])
+    t2.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
+    elements.append(t2)
+    elements.append(Spacer(1, 10))
 
-            # Master Excel 100% Utuh & Aman
-            ws["G2"] = no_register
-            ws["H3"] = f", {tgl_surat}"
-            ws["G4"] = str(tgl_pelaksanaan)
-            ws["G5"] = jam_pelaksanaan
-            ws["G6"] = tempat_akad
+    # CALON PASANGAN
+    elements.append(Paragraph("Dan hendak menikah dengan calon pasangan:", style_body))
+    elements.append(Spacer(1, 6))
 
-            ws["G8"] = pria_nama
-            ws["G9"] = pria_bin
-            ws["G10"] = pria_ttl
-            ws["K10"] = u_pria
-            ws["G11"] = str(pria_nik)
-            ws["G12"] = pria_pekerjaan
-            ws["G13"] = pria_status
-            ws["G16"] = pria_alamat
-            ws["G17"] = pria_pendidikan
+    table_pasangan = [
+        [Paragraph("1.", style_body), Paragraph("Nama Calon Istri", style_body), Paragraph(":", style_body), Paragraph(f"{data_dict['nama_pr']} binti {data_dict['binti_pr']}", style_bold)],
+        [Paragraph("2.", style_body), Paragraph("NIK", style_body), Paragraph(":", style_body), Paragraph(data_dict['nik_pr'], style_body)],
+        [Paragraph("3.", style_body), Paragraph("Tempat, Tgl Lahir", style_body), Paragraph(":", style_body), Paragraph(data_dict['ttl_pr'], style_body)],
+        [Paragraph("4.", style_body), Paragraph("Alamat", style_body), Paragraph(":", style_body), Paragraph(data_dict['alamat_pr'], style_body)],
+    ]
+    t3 = Table(table_pasangan, colWidths=[20, 130, 15, 380])
+    t3.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
+    elements.append(t3)
+    elements.append(Spacer(1, 15))
 
-            ws["G19"] = ayah_pria_nama
-            ws["J19"] = ayah_pria_bin
-            ws["G20"] = str(ayah_pria_nik)
-            ws["G21"] = ayah_pria_ttl
-            ws["K21"] = u_ayah_pria
-            ws["G22"] = ayah_pria_pekerjaan
-            ws["G23"] = ayah_pria_alamat
+    # TANDA TANGAN
+    data_ttd = [
+        ["", f"{data_dict['tgl_surat']}"],
+        ["", "Kepala Desa / Kasi Pelayanan"],
+        ["", "\n\n\n"],
+        ["", "<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>"]
+    ]
+    t_ttd = Table(data_ttd, colWidths=[300, 245])
+    t_ttd.setStyle(TableStyle([
+        ('ALIGN', (1,0), (1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+    ]))
+    elements.append(t_ttd)
 
-            ws["G26"] = ibu_pria_nama
-            ws["I26"] = ibu_pria_bin
-            ws["G27"] = str(ibu_pria_nik)
-            ws["G28"] = ibu_pria_ttl
-            ws["K28"] = u_ibu_pria
-            ws["G29"] = ibu_pria_pekerjaan
-            ws["G30"] = ibu_pria_alamat
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
 
-            ws["G34"] = wanita_nama
-            ws["G35"] = wanita_binti
-            ws["G36"] = wanita_ttl
-            ws["K36"] = u_wanita
-            ws["G37"] = str(wanita_nik)
-            ws["G38"] = wanita_pekerjaan
-            ws["G39"] = wanita_status
-            ws["G41"] = wanita_alamat
-            ws["G43"] = wanita_pendidikan
 
-            ws["G45"] = ayah_wanita_nama
-            ws["I45"] = ayah_wanita_bin
-            ws["G46"] = str(ayah_wanita_nik)
-            ws["G47"] = ayah_wanita_ttl
-            ws["K47"] = u_ayah_wanita
-            ws["G48"] = ayah_wanita_pekerjaan
-            ws["G49"] = ayah_wanita_alamat
+# --------------------------------------------------
+# PROSES EKSEKUSI PENYIMPANAN EXCEL & GENERATE PDF
+# --------------------------------------------------
+if submit:
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
+        sheet = wb['ISIAN DATA']
 
-            ws["G52"] = ibu_wanita_nama
-            ws["I52"] = ibu_wanita_bin
-            ws["G53"] = str(ibu_wanita_nik)
-            ws["G54"] = ibu_wanita_ttl
-            ws["K54"] = u_ibu_wanita
-            ws["G55"] = ibu_wanita_pekerjaan
-            ws["G56"] = ibu_wanita_alamat
+        cell_updates = {
+            'G2': no_register,
+            'H3': tgl_surat,
+            'G4': tgl_pelaksanaan.strftime('%Y-%m-%d'),
+            'G5': jam_akad,
+            'G6': tempat_akad,
+            'G8': nama_lk,
+            'G9': bin_lk,
+            'G10': ttl_lk,
+            'K10': umur_lk,
+            'G11': nik_lk,
+            'G12': pekerjaan_lk,
+            'G13': status_lk,
+            'G14': jk_lk,
+            'G15': istri_terdahulu,
+            'G16': alamat_lk,
+            'G17': pendidikan_lk,
+            'G19': nama_ayah_lk,
+            'J19': bin_ayah_lk,
+            'G20': nik_ayah_lk,
+            'G21': ttl_ayah_lk,
+            'K21': umur_ayah_lk,
+            'G22': pekerjaan_ayah_lk,
+            'G23': alamat_ayah_lk,
+            'G26': nama_ibu_lk,
+            'I26': bin_ibu_lk,
+            'G27': nik_ibu_lk,
+            'G28': ttl_ibu_lk,
+            'K28': umur_ibu_lk,
+            'G29': pekerjaan_ibu_lk,
+            'G30': alamat_ibu_lk,
+            'G34': nama_pr,
+            'G35': binti_pr,
+            'G36': ttl_pr,
+            'K36': umur_pr,
+            'G37': nik_pr,
+            'G38': pekerjaan_pr,
+            'G39': status_pr,
+            'G40': jk_pr,
+            'G41': alamat_pr,
+            'G42': suami_terdahulu,
+            'G43': pendidikan_pr,
+            'G45': nama_ayah_pr,
+            'I45': bin_ayah_pr,
+            'G46': nik_ayah_pr,
+            'G47': ttl_ayah_pr,
+            'K47': umur_ayah_pr,
+            'G48': pekerjaan_ayah_pr,
+            'G49': alamat_ayah_pr,
+            'G52': nama_ibu_pr,
+            'I52': bin_ibu_pr,
+            'G53': nik_ibu_pr,
+            'G54': ttl_ibu_pr,
+            'K54': umur_ibu_pr,
+            'G55': pekerjaan_ibu_pr,
+            'G56': alamat_ibu_pr,
+            'G58': nama_wali,
+            'G59': bin_wali,
+            'G60': nik_wali,
+            'G61': ttl_wali,
+            'K61': umur_wali,
+            'G62': pekerjaan_wali,
+            'G63': alamat_wali,
+            'G64': hubungan_wali,
+            'G65': mahar,
+            'G68': nama_wali_lengkap,
+            'G70': saksi1_nama,
+            'G71': saksi1_ttl,
+            'K71': saksi1_umur,
+            'G72': saksi1_nik,
+            'G73': saksi1_pekerjaan,
+            'G74': saksi1_alamat,
+            'G76': saksi2_nama,
+            'G77': saksi2_ttl,
+            'G78': saksi2_nik,
+            'G79': saksi2_pekerjaan,
+            'G80': saksi2_alamat,
+        }
 
-            ws["G58"] = wali_nama
-            ws["G59"] = wali_bin
-            ws["G60"] = str(wali_nik)
-            ws["G61"] = wali_ttl
-            ws["K61"] = u_wali
-            ws["G62"] = wali_pekerjaan
-            ws["G63"] = wali_alamat
-            ws["G64"] = wali_hubungan
-            ws["G65"] = mahar
-            ws["G68"] = nama_lengkap_wali_b68
+        for cell_ref, val in cell_updates.items():
+            sheet[cell_ref] = val
 
-            ws["G70"] = saksi1_nama
-            ws["G71"] = saksi1_ttl
-            ws["K71"] = u_saksi1
-            ws["G72"] = str(saksi1_nik)
-            ws["G73"] = saksi1_pekerjaan
-            ws["G74"] = saksi1_alamat
+        # Save Excel to memory
+        output_excel = BytesIO()
+        wb.save(output_excel)
+        output_excel.seek(0)
 
-            ws["G76"] = saksi2_nama
-            ws["G77"] = saksi2_ttl
-            ws["K77"] = u_saksi2
-            ws["G78"] = str(saksi2_nik)
-            ws["G79"] = saksi2_pekerjaan
-            ws["G80"] = saksi2_alamat
+        # Build PDF Data Dict
+        data_pdf = {
+            'no_register': no_register,
+            'tgl_surat': tgl_surat,
+            'nama_lk': nama_lk,
+            'bin_lk': bin_lk,
+            'nik_lk': nik_lk,
+            'jk_lk': jk_lk,
+            'ttl_lk': ttl_lk,
+            'pekerjaan_lk': pekerjaan_lk,
+            'status_lk': status_lk,
+            'alamat_lk': alamat_lk,
+            'nama_ayah_lk': nama_ayah_lk,
+            'bin_ayah_lk': bin_ayah_lk,
+            'nik_ayah_lk': nik_ayah_lk,
+            'ttl_ayah_lk': ttl_ayah_lk,
+            'pekerjaan_ayah_lk': pekerjaan_ayah_lk,
+            'alamat_ayah_lk': alamat_ayah_lk,
+            'nama_pr': nama_pr,
+            'binti_pr': binti_pr,
+            'nik_pr': nik_pr,
+            'ttl_pr': ttl_pr,
+            'alamat_pr': alamat_pr
+        }
 
-            excel_buffer = io.BytesIO()
-            wb.save(excel_buffer)
-            excel_buffer.seek(0)
+        pdf_bytes = create_f4_pdf(data_pdf)
 
-            st.success("✅ Data berhasil diproses!")
+        st.success("✅ Data berhasil diproses! Silakan pilih berkas yang ingin diunduh di bawah ini:")
 
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.download_button(
-                    label="📊 Download Excel Utuh (100% Asli Master)",
-                    data=excel_buffer,
-                    file_name=f"BERKAS_CATIN_{wanita_nama}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-                
-            with col2:
-                if HAS_REPORTLAB:
-                    pdf_data = {
-                        "1. Surat & Pelaksanaan Akad": {
-                            "No Register": no_register,
-                            "Tgl Terbit Surat": tgl_surat,
-                            "Hari / Tgl Akad": f"{hari_akad}, {tgl_pelaksanaan}",
-                            "Jam Pelaksanaan": jam_pelaksanaan,
-                            "Tempat Akad Nikah": tempat_akad
-                        },
-                        "2. Calon Pengantin Laki-Laki": {
-                            "Nama Laki-Laki": f"{pria_nama} bin {pria_bin}",
-                            "TTL / Umur": f"{pria_ttl} ({u_pria} Thn)",
-                            "NIK (Pria)": pria_nik,
-                            "Pekerjaan / Pendidikan": f"{pria_pekerjaan} / {pria_pendidikan}",
-                            "Status Pernikahan": pria_status,
-                            "Alamat (Pria)": pria_alamat
-                        },
-                        "Orang Tua Laki-Laki": {
-                            "Ayah Laki-Laki": f"{ayah_pria_nama} bin {ayah_pria_bin} (NIK: {ayah_pria_nik} | TTL: {ayah_pria_ttl} - {u_ayah_pria} Thn)",
-                            "Pekerjaan / Alamat Ayah": f"{ayah_pria_pekerjaan} - {ayah_pria_alamat}",
-                            "Ibu Laki-Laki": f"{ibu_pria_nama} binti {ibu_pria_bin} (NIK: {ibu_pria_nik} | TTL: {ibu_pria_ttl} - {u_ibu_pria} Thn)",
-                            "Pekerjaan / Alamat Ibu": f"{ibu_pria_pekerjaan} - {ibu_pria_alamat}"
-                        },
-                        "3. Calon Pengantin Perempuan": {
-                            "Nama Perempuan": f"{wanita_nama} binti {wanita_binti}",
-                            "TTL / Umur": f"{wanita_ttl} ({u_wanita} Thn)",
-                            "NIK (Perempuan)": wanita_nik,
-                            "Pekerjaan / Pendidikan": f"{wanita_pekerjaan} / {wanita_pendidikan}",
-                            "Status Pernikahan": wanita_status,
-                            "Alamat (Perempuan)": wanita_alamat
-                        },
-                        "Orang Tua Perempuan": {
-                            "Ayah Perempuan": f"{ayah_wanita_nama} bin {ayah_wanita_bin} (NIK: {ayah_wanita_nik} | TTL: {ayah_wanita_ttl} - {u_ayah_wanita} Thn)",
-                            "Pekerjaan / Alamat Ayah": f"{ayah_wanita_pekerjaan} - {ayah_wanita_alamat}",
-                            "Ibu Perempuan": f"{ibu_wanita_nama} binti {ibu_wanita_bin} (NIK: {ibu_wanita_nik} | TTL: {ibu_wanita_ttl} - {u_ibu_wanita} Thn)",
-                            "Pekerjaan / Alamat Ibu": f"{ibu_wanita_pekerjaan} - {ibu_wanita_alamat}"
-                        },
-                        "4. Wali & Mahar": {
-                            "Nama Wali / BIN": f"{wali_nama} bin {wali_bin} (Lengkap: {nama_lengkap_wali_b68})",
-                            "NIK / TTL / Umur Wali": f"{wali_nik} / {wali_ttl} ({u_wali} Thn)",
-                            "Pekerjaan / Hubungan": f"{wali_pekerjaan} / {wali_hubungan}",
-                            "Alamat Wali": wali_alamat,
-                            "Mahar / Maskawin": mahar
-                        },
-                        "5. Saksi-Saksi Nikah": {
-                            "Saksi 1 (Nama / NIK)": f"{saksi1_nama} (NIK: {saksi1_nik})",
-                            "TTL / Umur / Pekerjaan": f"{saksi1_ttl} ({u_saksi1} Thn) / {saksi1_pekerjaan}",
-                            "Alamat Saksi 1": saksi1_alamat,
-                            "Saksi 2 (Nama / NIK)": f"{saksi2_nama} (NIK: {saksi2_nik})",
-                            "TTL / Umur / Pekerjaan": f"{saksi2_ttl} ({u_saksi2} Thn) / {saksi2_pekerjaan}",
-                            "Alamat Saksi 2": saksi2_alamat
-                        }
-                    }
-                    pdf_buffer = generate_pdf_isian_data(pdf_data, tgl_surat)
-                    if pdf_buffer:
-                        st.download_button(
-                            label="📄 Download PDF (Full 1 Halaman F4 + TTD)",
-                            data=pdf_buffer,
-                            file_name=f"ISIAN_DATA_{wanita_nama}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-                else:
-                    st.warning("⚠️ Pustaka `reportlab` belum terinstal. Silakan jalankan `pip install reportlab` di terminal.")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            st.download_button(
+                label="📥 DOWNLOAD EXCEL UTUH (.XLSX)",
+                data=output_excel,
+                file_name=f"BERKAS_CATIN_{nama_lk}_{nama_pr}.xlsx".replace(" ", "_"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        with col_d2:
+            st.download_button(
+                label="📄 DOWNLOAD HALAMAN DEPAN PDF (F4)",
+                data=pdf_bytes,
+                file_name=f"PENGANTAR_NIKAH_F4_{nama_lk}.pdf".replace(" ", "_"),
+                mime="application/pdf",
+                use_container_width=True
+            )
 
-            wb.close()
-            gc.collect()
-
-        except Exception as e:
-            st.error(f"❌ Terjadi kesalahan saat memproses data: {e}")
+    except Exception as e:
+        st.error(f"Gagal memproses file: {e}")
