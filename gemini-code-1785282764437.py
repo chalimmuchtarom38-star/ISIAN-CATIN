@@ -32,11 +32,10 @@ NAMA_HARI = {
     "Sunday": "Minggu"
 }
 
-# FUNGSI MEMBUAT PDF REKAP ISIAN DATA (1 HALAMAN FULL + KETERANGAN PENGANTAR)
+# FUNGSI MEMBUAT PDF REKAP ISIAN DATA
 def generate_pdf_rekap(data_dict):
     buffer = BytesIO()
     
-    # Margin diperkecil (10pt) agar area cetak maksimal & muat TTD Pengantar
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -48,13 +47,12 @@ def generate_pdf_rekap(data_dict):
     
     styles = getSampleStyleSheet()
     
-    # Custom Styles
     style_title = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
         fontSize=12,
         leading=14,
-        alignment=1, # Center
+        alignment=1,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor('#0f172a'),
         spaceAfter=2
@@ -82,12 +80,11 @@ def generate_pdf_rekap(data_dict):
     style_cell_label = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#1e293b'))
     style_cell_val = ParagraphStyle('ValStyle', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica', textColor=colors.HexColor('#0f172a'))
     
-    style_ttd_title = ParagraphStyle('TTDTitle', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica-Bold', alignment=2) # Right align
+    style_ttd_title = ParagraphStyle('TTDTitle', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica-Bold', alignment=2)
     style_ttd_name = ParagraphStyle('TTDName', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica-Bold', alignment=2)
 
     elements = []
     
-    # Judul Header PDF
     elements.append(Paragraph("REKAP ISIAN DATA BERKAS CATIN DESA TAMBI", style_title))
     elements.append(Paragraph(f"<b>No. Register:</b> {data_dict.get('G2','')} &nbsp;|&nbsp; <b>Tanggal Surat:</b> {data_dict.get('H3','')}", style_sub))
     elements.append(Spacer(1, 4))
@@ -96,30 +93,29 @@ def generate_pdf_rekap(data_dict):
         st_use = style_cell_label if is_label else style_cell_val
         return Paragraph(str(txt) if txt else "-", st_use)
 
-    # Struktur Tabel Rapi
     table_data = [
-        # SECTION 1: PELAKSANAAN AKAD & CATIN LK
+        # SECTION 1
         [Paragraph("1. PELAKSANAAN AKAD NIKAH", style_section), "", Paragraph("2. CATIN LAKI-LAKI", style_section), ""],
         [make_p("Hari / Tgl Akad", True), make_p(f"{data_dict.get('I4','')} / {data_dict.get('G4','')}"), make_p("Nama / Bin", True), make_p(f"{data_dict.get('G8','')} bin {data_dict.get('G9','')}")],
         [make_p("Jam / Tempat", True), make_p(f"{data_dict.get('G5','')} @ {data_dict.get('G6','')}"), make_p("NIK / TTL", True), make_p(f"{data_dict.get('G11','')} / {data_dict.get('G10','')} ({data_dict.get('K10','')} th)")],
         [make_p("Mahar", True), make_p(data_dict.get('G65','')), make_p("Pekerjaan / Status", True), make_p(f"{data_dict.get('G12','')} / {data_dict.get('G13','')}")],
         [make_p("Pendidikan LK", True), make_p(data_dict.get('G17','')), make_p("Alamat LK", True), make_p(data_dict.get('G16',''))],
         
-        # SECTION 2: ORTU LAKI-LAKI & CATIN PR
+        # SECTION 2
         [Paragraph("3. AYAH & IBU CATIN LAKI-LAKI", style_section), "", Paragraph("4. CATIN PEREMPUAN", style_section), ""],
         [make_p("Ayah LK", True), make_p(f"{data_dict.get('G19','')} bin {data_dict.get('J19','')} ({data_dict.get('G20','')})"), make_p("Nama / Binti", True), make_p(f"{data_dict.get('G34','')} binti {data_dict.get('G35','')}")],
         [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G22','')} / {data_dict.get('G23','')}"), make_p("NIK / TTL", True), make_p(f"{data_dict.get('G37','')} / {data_dict.get('G36','')} ({data_dict.get('K36','')} th)")],
         [make_p("Ibu LK", True), make_p(f"{data_dict.get('G26','')} bin {data_dict.get('I26','')} ({data_dict.get('G27','')})"), make_p("Pekerjaan / Status", True), make_p(f"{data_dict.get('G38','')} / {data_dict.get('G39','')}")],
         [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G29','')} / {data_dict.get('G30','')}"), make_p("Alamat PR", True), make_p(data_dict.get('G41',''))],
 
-        # SECTION 3: ORTU PEREMPUAN & DATA WALI
+        # SECTION 3
         [Paragraph("5. AYAH & IBU CATIN PEREMPUAN", style_section), "", Paragraph("6. DATA WALI NIKAH", style_section), ""],
         [make_p("Ayah PR", True), make_p(f"{data_dict.get('G45','')} bin {data_dict.get('I45','')} ({data_dict.get('G46','')})"), make_p("Nama Wali", True), make_p(f"{data_dict.get('G68','')} ({data_dict.get('G64','')})")],
         [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G48','')} / {data_dict.get('G49','')}"), make_p("NIK / TTL / Umur", True), make_p(f"{data_dict.get('G60','')} / {data_dict.get('G61','')} ({data_dict.get('K61','')} th)")],
         [make_p("Ibu PR", True), make_p(f"{data_dict.get('G52','')} bin {data_dict.get('I52','')} ({data_dict.get('G53','')})"), make_p("Pekerjaan / Alamat", True), make_p(f"{data_dict.get('G62','')} / {data_dict.get('G63','')}")],
         [make_p("Pekerjaan/Alamat", True), make_p(f"{data_dict.get('G55','')} / {data_dict.get('G56','')}"), make_p("Mahar", True), make_p(data_dict.get('G65',''))],
 
-        # SECTION 4: DATA SAKSI 1 & 2
+        # SECTION 4
         [Paragraph("7. SAKSI 1 & SAKSI 2", style_section), "", "", ""],
         [make_p("Saksi 1", True), make_p(f"{data_dict.get('G70','')} | NIK: {data_dict.get('G72','')} | TTL: {data_dict.get('G71','')} ({data_dict.get('K71','')} th) | Pekerjaan: {data_dict.get('G73','')} | Alamat: {data_dict.get('G74','')}")],
         [make_p("Saksi 2", True), make_p(f"{data_dict.get('G76','')} | NIK: {data_dict.get('G78','')} | TTL: {data_dict.get('G77','')} | Pekerjaan: {data_dict.get('G79','')} | Alamat: {data_dict.get('G80','')}")],
@@ -156,13 +152,10 @@ def generate_pdf_rekap(data_dict):
     elements.append(t)
     elements.append(Spacer(1, 8))
     
-    # --------------------------------------------------
-    # KETERANGAN PENGANTAR (KASI PELAYANAN)
-    # --------------------------------------------------
     ttd_data = [
         ["", Paragraph("Tambi, " + data_dict.get('H3','').replace('TAMBI, ',''), style_ttd_title)],
         ["", Paragraph("Yang Mengantar,<br/><b>Kasi Pelayanan</b>", style_ttd_title)],
-        ["", Spacer(1, 22)], # Ruang Tanda Tangan
+        ["", Spacer(1, 22)],
         ["", Paragraph("<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>", style_ttd_name)]
     ]
     
@@ -175,16 +168,12 @@ def generate_pdf_rekap(data_dict):
     ]))
     
     elements.append(table_ttd)
-    
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
-# --------------------------------------------------
 # FORMULIR INPUT DATA
-# --------------------------------------------------
 with st.form("form_catin"):
-    
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📝 Register & Akad",
         "👨 Catin Laki-Laki & Ortu",
@@ -193,9 +182,6 @@ with st.form("form_catin"):
         "👥 Data Saksi 1 & 2"
     ])
     
-    # --------------------------------------------------
-    # TAB 1: REGISTER & AKAD NIKAH
-    # --------------------------------------------------
     with tab1:
         st.subheader("Surat & Pelaksanaan Akad Nikah")
         col1, col2 = st.columns(2)
@@ -209,14 +195,11 @@ with st.form("form_catin"):
             email_catin = st.text_input("Email Catin", value="")
             mahar = st.text_input("Maskawin / Mahar", value="Seperangkat Alat Sholat")
 
-    # --------------------------------------------------
-    # TAB 2: CATIN LAKI-LAKI & ORTU
-    # --------------------------------------------------
     with tab2:
         st.subheader("Data Calon Pengantin Laki-Laki")
         col_lk1, col_lk2 = st.columns(2)
         with col_lk1:
-            nama_lk = st.text_input("Nama Calon Pengantin Laki-Laki", value="MIfahul Anam")
+            nama_lk = st.text_input("Nama Calon Pengantin Laki-Laki", value="Miftahul Anam")
             bin_lk = st.text_input("Bin (Ayah Laki-Laki)", value="Nur Karim")
             ttl_lk = st.text_input("Tempat, Tanggal Lahir Laki-Laki", value="Pemalang, 18 Februari 1999")
             umur_lk = st.number_input("Umur Laki-Laki", value=27)
@@ -252,9 +235,6 @@ with st.form("form_catin"):
             pekerjaan_ibu_lk = st.text_input("Pekerjaan Ibu Laki-Laki", value="Mengurus Rumah Tangga")
             alamat_ibu_lk = st.text_area("Alamat Ibu Laki-Laki", value="RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang")
 
-    # --------------------------------------------------
-    # TAB 3: CATIN PEREMPUAN & ORTU
-    # --------------------------------------------------
     with tab3:
         st.subheader("Data Calon Pengantin Perempuan")
         col_pr1, col_pr2 = st.columns(2)
@@ -295,9 +275,6 @@ with st.form("form_catin"):
             pekerjaan_ibu_pr = st.text_input("Pekerjaan Ibu Perempuan", value="Mengurus Rumah Tangga")
             alamat_ibu_pr = st.text_area("Alamat Ibu Perempuan", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
-    # --------------------------------------------------
-    # TAB 4: DATA WALI
-    # --------------------------------------------------
     with tab4:
         st.subheader("Data Wali Nikah")
         col_w1, col_w2 = st.columns(2)
@@ -305,7 +282,7 @@ with st.form("form_catin"):
             nama_wali = st.text_input("Nama Wali", value="Disun")
             bin_wali = st.text_input("Bin Wali", value="Tawiroji")
             nik_wali = st.text_input("NIK Wali", value="3327042504840003")
-            ttl_wali = st.text_input("TTL Wali", value="PEMALANG, 21 April 1984")
+            ttl_wali = st.text_input("TTL Wali", value="Pemalang, 21 April 1984")
             umur_wali = st.number_input("Umur Wali", value=42)
         with col_w2:
             pekerjaan_wali = st.text_input("Pekerjaan Wali", value="PETANI/ PEKEBUN")
@@ -313,9 +290,6 @@ with st.form("form_catin"):
             hubungan_wali = st.text_input("Hubungan Wali", value="AYAH KANDUNG")
             nama_wali_lengkap = st.text_input("Nama Wali Lengkap (Nama Bin)", value="Disun Bin Tawiroji")
 
-    # --------------------------------------------------
-    # TAB 5: DATA SAKSI 1 & 2
-    # --------------------------------------------------
     with tab5:
         col_s1, col_s2 = st.columns(2)
         with col_s1:
@@ -325,7 +299,7 @@ with st.form("form_catin"):
             saksi1_umur = st.number_input("Umur Saksi 1", value=37)
             saksi1_nik = st.text_input("NIK Saksi 1", value="3327042110890004")
             saksi1_pekerjaan = st.text_input("Pekerjaan Saksi 1", value="Perangkat Desa")
-            saksi1_alamat = st.text_area("Alamat Saksi 1", value="RT 002 RW 001 Desa Tambi Kecamatan Watukumpu Kabupaten Pemalang")
+            saksi1_alamat = st.text_area("Alamat Saksi 1", value="RT 002 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
         with col_s2:
             st.subheader("Data Saksi 2")
@@ -337,18 +311,13 @@ with st.form("form_catin"):
 
     submit = st.form_submit_button("💾 ISIKAN KE EXCEL & GENERATE BERKAS")
 
-# --------------------------------------------------
-# MENGISI FILE EXCEL TANPA MERUSAK KODE / RUMUS
-# --------------------------------------------------
 if submit:
     try:
         wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
         sheet = wb['ISIAN DATA']
 
-        # Mendapatkan nama hari dari tanggal pelaksanaan akad
         hari_akad = NAMA_HARI.get(tgl_pelaksanaan.strftime("%A"), "")
 
-        # Mapping tepat sesuai koordinat Cell sheet ISIAN DATA
         cell_updates = {
             'G2': no_register,
             'H3': tgl_surat,
@@ -429,16 +398,13 @@ if submit:
             'G80': saksi2_alamat,
         }
 
-        # Melakukan update hanya pada cell yang ditentukan
         for cell_ref, val in cell_updates.items():
             sheet[cell_ref] = val
 
-        # Simpan Excel ke memori
         output_excel = BytesIO()
         wb.save(output_excel)
         output_excel.seek(0)
 
-        # Generate PDF
         output_pdf = generate_pdf_rekap(cell_updates)
 
         st.success("✅ Success! Data berhasil diisikan ke sheet ISIAN DATA. Semua rumus antar sheet tetap bekerja 100% sempurna.")
