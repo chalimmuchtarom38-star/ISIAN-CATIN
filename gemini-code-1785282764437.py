@@ -32,28 +32,28 @@ NAMA_HARI = {
     "Sunday": "Minggu"
 }
 
-# FUNGSI MEMBUAT PDF REKAP ISIAN DATA (FONT MAKSIMAL 1 HALAMAN FULL)
+# FUNGSI MEMBUAT PDF REKAP ISIAN DATA (1 HALAMAN FULL + KETERANGAN PENGANTAR)
 def generate_pdf_rekap(data_dict):
     buffer = BytesIO()
     
-    # Margin diperkecil (10pt ~ 3.5mm) agar area cetak maksimal
+    # Margin diperkecil (10pt) agar area cetak maksimal & muat TTD Pengantar
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         leftMargin=10,
         rightMargin=10,
-        topMargin=12,
-        bottomMargin=12
+        topMargin=10,
+        bottomMargin=10
     )
     
     styles = getSampleStyleSheet()
     
-    # Custom Styles diperbesar
+    # Custom Styles
     style_title = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=13,
-        leading=15,
+        fontSize=12,
+        leading=14,
         alignment=1, # Center
         fontName='Helvetica-Bold',
         textColor=colors.HexColor('#0f172a'),
@@ -63,7 +63,7 @@ def generate_pdf_rekap(data_dict):
     style_sub = ParagraphStyle(
         'SubTitleStyle',
         parent=styles['Normal'],
-        fontSize=9.5,
+        fontSize=9,
         leading=11,
         alignment=1,
         fontName='Helvetica-Bold',
@@ -73,28 +73,30 @@ def generate_pdf_rekap(data_dict):
     style_section = ParagraphStyle(
         'SecStyle',
         parent=styles['Normal'],
-        fontSize=9,
-        leading=11,
+        fontSize=8.5,
+        leading=10,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor('#1e3a8a')
     )
     
-    # Ukuran font isi tabel diperbesar ke 8.5pt (sangat jelas terbaca)
-    style_cell_label = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica-Bold', textColor=colors.HexColor('#1e293b'))
-    style_cell_val = ParagraphStyle('ValStyle', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica', textColor=colors.HexColor('#0f172a'))
+    style_cell_label = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#1e293b'))
+    style_cell_val = ParagraphStyle('ValStyle', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica', textColor=colors.HexColor('#0f172a'))
     
+    style_ttd_title = ParagraphStyle('TTDTitle', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica-Bold', alignment=2) # Right align
+    style_ttd_name = ParagraphStyle('TTDName', parent=styles['Normal'], fontSize=8.5, leading=10, fontName='Helvetica-Bold', alignment=2)
+
     elements = []
     
     # Judul Header PDF
     elements.append(Paragraph("REKAP ISIAN DATA BERKAS CATIN DESA TAMBI", style_title))
     elements.append(Paragraph(f"<b>No. Register:</b> {data_dict.get('G2','')} &nbsp;|&nbsp; <b>Tanggal Surat:</b> {data_dict.get('H3','')}", style_sub))
-    elements.append(Spacer(1, 6))
+    elements.append(Spacer(1, 4))
     
     def make_p(txt, is_label=False):
         st_use = style_cell_label if is_label else style_cell_val
         return Paragraph(str(txt) if txt else "-", st_use)
 
-    # Struktur Tabel Rapi & Padat
+    # Struktur Tabel Rapi
     table_data = [
         # SECTION 1: PELAKSANAAN AKAD & CATIN LK
         [Paragraph("1. PELAKSANAAN AKAD NIKAH", style_section), "", Paragraph("2. CATIN LAKI-LAKI", style_section), ""],
@@ -123,8 +125,7 @@ def generate_pdf_rekap(data_dict):
         [make_p("Saksi 2", True), make_p(f"{data_dict.get('G76','')} | NIK: {data_dict.get('G78','')} | TTL: {data_dict.get('G77','')} | Pekerjaan: {data_dict.get('G79','')} | Alamat: {data_dict.get('G80','')}")],
     ]
     
-    # Lebar total tabel diperbesar penuh A4 (575pt)
-    t = Table(table_data, colWidths=[100, 187, 100, 188])
+    t = Table(table_data, colWidths=[98, 189, 98, 190])
     t.setStyle(TableStyle([
         ('SPAN', (0,0), (1,0)),
         ('SPAN', (2,0), (3,0)),
@@ -138,8 +139,8 @@ def generate_pdf_rekap(data_dict):
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#94a3b8')),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
-        ('TOPPADDING', (0,0), (-1,-1), 3.5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3.5),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
@@ -153,6 +154,28 @@ def generate_pdf_rekap(data_dict):
     ]))
     
     elements.append(t)
+    elements.append(Spacer(1, 8))
+    
+    # --------------------------------------------------
+    # KETERANGAN PENGANTAR (KASI PELAYANAN)
+    # --------------------------------------------------
+    ttd_data = [
+        ["", Paragraph("Tambi, " + data_dict.get('H3','').replace('TAMBI, ',''), style_ttd_title)],
+        ["", Paragraph("Yang Mengantar,<br/><b>Kasi Pelayanan</b>", style_ttd_title)],
+        ["", Spacer(1, 22)], # Ruang Tanda Tangan
+        ["", Paragraph("<u><b>CHALIM MUCHTAROM, S.Pd.I</b></u>", style_ttd_name)]
+    ]
+    
+    table_ttd = Table(ttd_data, colWidths=[370, 205])
+    table_ttd.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('TOPPADDING', (0,0), (-1,-1), 1),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+    ]))
+    
+    elements.append(table_ttd)
+    
     doc.build(elements)
     buffer.seek(0)
     return buffer
