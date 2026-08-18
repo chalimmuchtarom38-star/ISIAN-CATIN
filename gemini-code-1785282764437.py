@@ -82,14 +82,14 @@ def generate_pdf_f4(data):
     # Ukuran F4 / Folio: 215mm x 330mm
     f4_size = (215 * mm, 330 * mm)
     
-    # Margin hemat (8mm) agar semua data muat 1 lembar utuh
+    # Margin hemat (7mm) agar semua data & tanda tangan muat 1 lembar utuh
     doc = SimpleDocTemplate(
         buffer,
         pagesize=f4_size,
-        leftMargin=8 * mm,
-        rightMargin=8 * mm,
-        topMargin=8 * mm,
-        bottomMargin=8 * mm
+        leftMargin=7 * mm,
+        rightMargin=7 * mm,
+        topMargin=7 * mm,
+        bottomMargin=7 * mm
     )
     
     styles = getSampleStyleSheet()
@@ -97,30 +97,30 @@ def generate_pdf_f4(data):
     title_style = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=11,
-        leading=13,
+        fontSize=10.5,
+        leading=12,
         alignment=1, # Center
         fontName='Helvetica-Bold'
     )
     
     sec_title_style = ParagraphStyle(
         'SecTitleStyle',
-        fontSize=8.5,
-        leading=10,
+        fontSize=8,
+        leading=9.5,
         fontName='Helvetica-Bold',
         textColor=colors.HexColor('#003366')
     )
     
-    lbl_style = ParagraphStyle('LblStyle', fontSize=7.5, leading=9, fontName='Helvetica-Bold')
-    val_style = ParagraphStyle('ValStyle', fontSize=7.5, leading=9, fontName='Helvetica')
+    lbl_style = ParagraphStyle('LblStyle', fontSize=7, leading=8.5, fontName='Helvetica-Bold')
+    val_style = ParagraphStyle('ValStyle', fontSize=7, leading=8.5, fontName='Helvetica')
     
     elements = []
     
     # KOP / JUDUL DOKUMEN
-    elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG - KECAMATAN WATUKUMPUL", ParagraphStyle('Kop1', fontSize=8, alignment=1, fontName='Helvetica-Bold')))
+    elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG - KECAMATAN WATUKUMPUL", ParagraphStyle('Kop1', fontSize=7.5, alignment=1, fontName='Helvetica-Bold')))
     elements.append(Paragraph("RINGKASAN LEMBAR VERIFIKASI BERKAS CALON PENGANTIN DESA TAMBI", title_style))
-    elements.append(Paragraph(f"No. Register: <b>{data.get('no_register', '-')}</b> | Tanggal Surat: <b>{data.get('tgl_surat', '-')}</b>", ParagraphStyle('SubTitle', fontSize=8, alignment=1, leading=10)))
-    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(f"No. Register: <b>{data.get('no_register', '-')}</b> | Tanggal Surat: <b>{data.get('tgl_surat', '-')}</b>", ParagraphStyle('SubTitle', fontSize=7.5, alignment=1, leading=9)))
+    elements.append(Spacer(1, 3))
     
     # Helper baris tabel tunggal
     def row1(lbl, val):
@@ -133,7 +133,7 @@ def generate_pdf_f4(data):
             Paragraph(lbl2, lbl_style), Paragraph(":", lbl_style), Paragraph(str(val2 or '-'), val_style)
         ]
 
-    # I. PELAKSANAAN AKAD NIKAH (TERMASUK HARI AKAD)
+    # I. PELAKSANAAN AKAD NIKAH
     hari_tgl_akad = f"{get_hari_tgl(data.get('tgl_pelaksanaan', '-'))} (Jam: {data.get('jam_akad', '-')})"
     tabel_akad_data = [
         [Paragraph("I. PELAKSANAAN AKAD NIKAH", sec_title_style), "", ""],
@@ -143,7 +143,7 @@ def generate_pdf_f4(data):
         row1("Email Catin", data.get('email_catin', '-')),
     ]
 
-    # II & III. CATIN LAKI-LAKI & PEREMPUAN (LENGKAP TTL & ALAMAT)
+    # II & III. CATIN LAKI-LAKI & PEREMPUAN
     tabel_catin_data = [
         [Paragraph("II. CALON PENGANTIN LAKI-LAKI", sec_title_style), "", "", Paragraph("III. CALON PENGANTIN PEREMPUAN", sec_title_style), "", ""],
         row2("Nama Lengkap", data.get('nama_lk','-'), "Nama Lengkap", data.get('nama_pr','-')),
@@ -158,7 +158,7 @@ def generate_pdf_f4(data):
         row2("Alamat Lengkap", data.get('alamat_lk','-'), "Alamat Lengkap", data.get('alamat_pr','-')),
     ]
 
-    # IV & V. ORANG TUA LAKI-LAKI & PEREMPUAN (LENGKAP TTL, NIK, ALAMAT)
+    # IV & V. ORANG TUA LAKI-LAKI & PEREMPUAN
     tabel_ortu_data = [
         [Paragraph("IV. ORANG TUA LAKI-LAKI", sec_title_style), "", "", Paragraph("V. ORANG TUA PEREMPUAN", sec_title_style), "", ""],
         row2("Ayah / Bin", f"{data.get('nama_ayah_lk','-')} bin {data.get('bin_ayah_lk','-')}", "Ayah / Bin", f"{data.get('nama_ayah_pr','-')} bin {data.get('bin_ayah_pr','-')}"),
@@ -186,51 +186,74 @@ def generate_pdf_f4(data):
 
     style_table = TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 0.5),
-        ('TOPPADDING', (0,0), (-1,-1), 0.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0.3),
+        ('TOPPADDING', (0,0), (-1,-1), 0.3),
         ('LEFTPADDING', (0,0), (-1,-1), 1),
         ('RIGHTPADDING', (0,0), (-1,-1), 1),
         ('LINEBELOW', (0,0), (-1,0), 0.5, colors.HexColor('#CCCCCC')),
     ])
 
-    t1 = Table(tabel_akad_data, colWidths=[35*mm, 4*mm, 160*mm])
+    t1 = Table(tabel_akad_data, colWidths=[34*mm, 3*mm, 164*mm])
     t1.setStyle(style_table)
     
-    t2 = Table(tabel_catin_data, colWidths=[27*mm, 3*mm, 69*mm, 27*mm, 3*mm, 69*mm])
+    t2 = Table(tabel_catin_data, colWidths=[26*mm, 3*mm, 71*mm, 26*mm, 3*mm, 71*mm])
     t2.setStyle(style_table)
 
-    t3 = Table(tabel_ortu_data, colWidths=[27*mm, 3*mm, 69*mm, 27*mm, 3*mm, 69*mm])
+    t3 = Table(tabel_ortu_data, colWidths=[26*mm, 3*mm, 71*mm, 26*mm, 3*mm, 71*mm])
     t3.setStyle(style_table)
 
-    t4 = Table(tabel_wali_saksi, colWidths=[27*mm, 3*mm, 69*mm, 27*mm, 3*mm, 69*mm])
+    t4 = Table(tabel_wali_saksi, colWidths=[26*mm, 3*mm, 71*mm, 26*mm, 3*mm, 71*mm])
     t4.setStyle(style_table)
 
     elements.extend([
-        t1, Spacer(1, 3), 
-        t2, Spacer(1, 3), 
-        t3, Spacer(1, 3), 
-        t4, Spacer(1, 8)
+        t1, Spacer(1, 2), 
+        t2, Spacer(1, 2), 
+        t3, Spacer(1, 2), 
+        t4, Spacer(1, 6)
     ])
     
-    # KOTAK TANDA TANGAN
-    ttd_data = [
+    # 1. KOTAK TANDA TANGAN CATIN & WALI
+    ttd_catin = [
         [Paragraph("Catin Laki-Laki", lbl_style), Paragraph("Catin Perempuan", lbl_style), Paragraph("Wali Nikah", lbl_style)],
-        [Spacer(1, 16), Spacer(1, 16), Spacer(1, 16)],
+        [Spacer(1, 14), Spacer(1, 14), Spacer(1, 14)],
         [
             Paragraph(f"( <b>{data.get('nama_lk','...')}</b> )", val_style), 
             Paragraph(f"( <b>{data.get('nama_pr','...')}</b> )", val_style), 
             Paragraph(f"( <b>{data.get('nama_wali','...')}</b> )", val_style)
         ]
     ]
-    t_ttd = Table(ttd_data, colWidths=[66*mm, 66*mm, 66*mm])
-    t_ttd.setStyle(TableStyle([
+    t_ttd1 = Table(ttd_catin, colWidths=[67*mm, 67*mm, 67*mm])
+    t_ttd1.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('BOTTOMPADDING', (0,0), (-1,-1), 0),
         ('TOPPADDING', (0,0), (-1,-1), 0),
     ]))
     
-    elements.append(t_ttd)
+    # 2. KOTAK TANDA TANGAN KEPALA DESA & KASI PELAYANAN
+    tgl_surat_str = data.get('tgl_surat', 'Tambi, ................. 2026')
+    ttd_pemdes = [
+        [
+            Paragraph("Mengetahui,<br/><b>KEPALA DESA TAMBI</b>", lbl_style), 
+            Paragraph("", lbl_style), 
+            Paragraph(f"{tgl_surat_str}<br/><b>KASI PELAYANAN DESA TAMBI</b>", lbl_style)
+        ],
+        [Spacer(1, 16), Spacer(1, 16), Spacer(1, 16)],
+        [
+            Paragraph("<b><u>JURI</u></b>", val_style), 
+            Paragraph("", val_style), 
+            Paragraph("<b><u>CHALIM MUCHTAROM, S.Pd.I</u></b>", val_style)
+        ]
+    ]
+    t_ttd2 = Table(ttd_pemdes, colWidths=[80*mm, 41*mm, 80*mm])
+    t_ttd2.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+    ]))
+
+    elements.extend([t_ttd1, Spacer(1, 5), t_ttd2])
     
     doc.build(elements)
     pdf_data = buffer.getvalue()
@@ -422,7 +445,7 @@ with col_act2:
 if submit:
     save_draft_file()
     
-    with st.spinner("⏳ Memproses Excel & Membuat PDF F4 Lengkap..."):
+    with st.spinner("⏳ Memproses Excel & Membuat PDF F4 Lengkap dengan Pengesahan Kades & Kasi..."):
         data_dict = {key: st.session_state[key] for key in st.session_state}
         
         # 1. GENERATE EXCEL
