@@ -6,6 +6,12 @@ import os
 from io import BytesIO
 from datetime import datetime, date
 
+# Import modul untuk generate PDF F4 1 Lembar
+from reportlab.lib.pagesizes import mm
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
 st.set_page_config(
     page_title="Aplikasi Berkas Catin - Desa Tambi",
     page_icon="📜",
@@ -15,11 +21,10 @@ st.set_page_config(
 EXCEL_FILE = "BERKAS CATIN .xlsx"
 DRAFT_FILE = "draf_terakhir.json"
 
-# --- FUNGSI RUMUS HITUNG UMUR (TETAP ADA & AMAN) ---
+# --- FUNGSI RUMUS HITUNG UMUR ---
 def hitung_umur(ttl_str):
     if not ttl_str:
         return 0
-    # Mencari 4 digit angka tahun (19xx atau 20xx) dari teks TTL
     match = re.search(r'\b(19\d{2}|20\d{2})\b', str(ttl_str))
     if match:
         tahun_lahir = int(match.group(1))
@@ -49,11 +54,140 @@ def save_draft_file():
     with open(DRAFT_FILE, "w", encoding="utf-8") as f:
         json.dump(draft_data, f, ensure_ascii=False, indent=2)
 
+# --- FUNGSI GENERATE PDF F4 (1 LEMBAR) ---
+def generate_pdf_f4(data):
+    buffer = BytesIO()
+    # Ukuran F4 / Folio: 215mm x 330mm
+    f4_size = (215 * mm, 330 * mm)
+    
+    # Margin hemat (10mm) agar pas 1 lembar F4
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=f4_size,
+        leftMargin=10 * mm,
+        rightMargin=10 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm
+    )
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'TitleStyle',
+        parent=styles['Heading1'],
+        fontSize=12,
+        leading=14,
+        alignment=1, # Center
+        fontName='Helvetica-Bold'
+    )
+    
+    label_style = ParagraphStyle('LabelStyle', fontSize=8, leading=10, fontName='Helvetica-Bold')
+    val_style = ParagraphStyle('ValStyle', fontSize=8, leading=10, fontName='Helvetica')
+    
+    elements = []
+    
+    # Judul Dokumen
+    elements.append(Paragraph("RINGKASAN BERKAS CALON PENGANTIN - DESA TAMBI", title_style))
+    elements.append(Paragraph(f"No. Reg: {data.get('no_register', '-')} | Tgl Surat: {data.get('tgl_surat', '-')}", ParagraphStyle('SubTitle', fontSize=9, alignment=1, leading=11)))
+    elements.append(Spacer(1, 8))
+    
+    # Helper untuk format baris tabel
+    def make_row(lbl, val):
+        return [Paragraph(lbl, label_style), Paragraph(":", label_style), Paragraph(str(val or '-'), val_style)]
+
+    # Section 1: Pelaksanaan Akad
+    tabel_akad_data = [
+        [Paragraph("<b>I. PELAKSANAAN AKAD NIKAH</b>", label_style), "", ""],
+        make_row("Tgl / Jam Akad", f"{data.get('tgl_pelaksanaan', '-')} / {data.get('jam_akad', '-')}"),
+        make_row("Tempat Akad", data.get('tempat_akad', '-')),
+        make_row("Mahar / Maskawin", data.get('mahar', '-')),
+    ]
+    
+    # Section 2: Data Catin LK & PR
+    tabel_catin_data = [
+        [Paragraph("<b>II. CATIN LAKI-LAKI</b>", label_style), "", "", Paragraph("<b>III. CATIN PEREMPUAN</b>", label_style), "", ""],
+        [Paragraph("Nama", label_style), Paragraph(":", label_style), Paragraph(data.get('nama_lk','-'), val_style),
+         Paragraph("Nama", label_style), Paragraph(":", label_style), Paragraph(data.get('nama_pr','-'), val_style)],
+        [Paragraph("Bin", label_style), Paragraph(":", label_style), Paragraph(data.get('bin_lk','-'), val_style),
+         Paragraph("Binti", label_style), Paragraph(":", label_style), Paragraph(data.get('binti_pr','-'), val_style)],
+        [Paragraph("NIK", label_style), Paragraph(":", label_style), Paragraph(data.get('nik_lk','-'), val_style),
+         Paragraph("NIK", label_style), Paragraph(":", label_style), Paragraph(data.get('nik_pr','-'), val_style)],
+        [Paragraph("TTL / Umur", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('ttl_lk','-')} ({hitung_umur(data.get('ttl_lk'))} Thn)", val_style),
+         Paragraph("TTL / Umur", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('ttl_pr','-')} ({hitung_umur(data.get('ttl_pr'))} Thn)", val_style)],
+        [Paragraph("Pekerjaan", label_style), Paragraph(":", label_style), Paragraph(data.get('pekerjaan_lk','-'), val_style),
+         Paragraph("Pekerjaan", label_style), Paragraph(":", label_style), Paragraph(data.get('pekerjaan_pr','-'), val_style)],
+        [Paragraph("Alamat", label_style), Paragraph(":", label_style), Paragraph(data.get('alamat_lk','-'), val_style),
+         Paragraph("Alamat", label_style), Paragraph(":", label_style), Paragraph(data.get('alamat_pr','-'), val_style)],
+    ]
+
+    # Section 3: Orang Tua
+    tabel_ortu_data = [
+        [Paragraph("<b>IV. ORANG TUA LAKI-LAKI</b>", label_style), "", "", Paragraph("<b>V. ORANG TUA PEREMPUAN</b>", label_style), "", ""],
+        [Paragraph("Ayah", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ayah_lk','-')} (NIK: {data.get('nik_ayah_lk','-')})", val_style),
+         Paragraph("Ayah", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ayah_pr','-')} (NIK: {data.get('nik_ayah_pr','-')})", val_style)],
+        [Paragraph("Ibu", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ibu_lk','-')} (NIK: {data.get('nik_ibu_lk','-')})", val_style),
+         Paragraph("Ibu", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ibu_pr','-')} (NIK: {data.get('nik_ibu_pr','-')})", val_style)],
+    ]
+
+    # Section 4: Wali & Saksi
+    tabel_wali_saksi = [
+        [Paragraph("<b>VI. DATA WALI NIKAH</b>", label_style), "", "", Paragraph("<b>VII. DATA SAKSI-SAKSI</b>", label_style), "", ""],
+        [Paragraph("Nama Wali", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_wali','-')} bin {data.get('bin_wali','-')}", val_style),
+         Paragraph("Saksi 1", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('saksi1_nama','-')} (NIK: {data.get('saksi1_nik','-')})", val_style)],
+        [Paragraph("Hubungan", label_style), Paragraph(":", label_style), Paragraph(data.get('hubungan_wali','-'), val_style),
+         Paragraph("Saksi 2", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('saksi2_nama','-')} (NIK: {data.get('saksi2_nik','-')})", val_style)],
+        [Paragraph("NIK Wali", label_style), Paragraph(":", label_style), Paragraph(data.get('nik_wali','-'), val_style),
+         Paragraph("", label_style), Paragraph("", label_style), Paragraph("", val_style)],
+    ]
+
+    style_table = TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+        ('TOPPADDING', (0,0), (-1,-1), 1),
+        ('LEFTPADDING', (0,0), (-1,-1), 2),
+        ('RIGHTPADDING', (0,0), (-1,-1), 2),
+    ])
+
+    t1 = Table(tabel_akad_data, colWidths=[30*mm, 5*mm, 160*mm])
+    t1.setStyle(style_table)
+    
+    t2 = Table(tabel_catin_data, colWidths=[25*mm, 4*mm, 66*mm, 25*mm, 4*mm, 66*mm])
+    t2.setStyle(style_table)
+
+    t3 = Table(tabel_ortu_data, colWidths=[25*mm, 4*mm, 66*mm, 25*mm, 4*mm, 66*mm])
+    t3.setStyle(style_table)
+
+    t4 = Table(tabel_wali_saksi, colWidths=[25*mm, 4*mm, 66*mm, 25*mm, 4*mm, 66*mm])
+    t4.setStyle(style_table)
+
+    elements.extend([t1, Spacer(1, 6), t2, Spacer(1, 6), t3, Spacer(1, 6), t4, Spacer(1, 15)])
+    
+    # Kolom Tanda Tangan
+    ttd_data = [
+        [Paragraph("Catin Laki-Laki", label_style), Paragraph("Catin Perempuan", label_style), Paragraph("Wali Nikah", label_style)],
+        [Spacer(1, 25), Spacer(1, 25), Spacer(1, 25)],
+        [Paragraph(f"( <b>{data.get('nama_lk','...')}</b> )", val_style), 
+         Paragraph(f"( <b>{data.get('nama_pr','...')}</b> )", val_style), 
+         Paragraph(f"( <b>{data.get('nama_wali','...')}</b> )", val_style)]
+    ]
+    t_ttd = Table(ttd_data, colWidths=[65*mm, 65*mm, 65*mm])
+    t_ttd.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    
+    elements.append(t_ttd)
+    
+    doc.build(elements)
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    return pdf_data
+
+
 draft = load_draft()
 
-st.title("📜 Form Input Berkas Catin")
+st.title("📜 Form Input Berkas Catin Desa Tambi")
 
-# --- TOMBOL ATAS ---
+# --- TOMBOL RESET ---
 col_top1, col_top2 = st.columns([1, 4])
 with col_top1:
     if st.button("🔄 Reset Form / Hapus Draf"):
@@ -99,7 +233,6 @@ with tab2:
         st.text_input("Bin (Ayah Laki-Laki)", value=draft.get("bin_lk", "Nur Karim"), key="bin_lk")
         
         ttl_lk = st.text_input("TTL Laki-Laki", value=draft.get("ttl_lk", "Pemalang, 18 Februari 1999"), key="ttl_lk")
-        # Menampilkan hasil hitung umur otomatis
         st.info(f"💡 Umur Catin LK: **{hitung_umur(ttl_lk)} Tahun**")
         
         st.text_input("NIK Laki-Laki", value=draft.get("nik_lk", "3327031802990004"), key="nik_lk")
@@ -228,32 +361,71 @@ with col_act1:
         st.toast("✅ Draf berhasil disimpan!", icon="💾")
 
 with col_act2:
-    submit = st.button("🚀 PROSES KE EXCEL & GENERATE BERKAS", type="primary", use_container_width=True)
+    submit = st.button("🚀 PROSES KE EXCEL & GENERATE BERKAS (PDF/EXCEL)", type="primary", use_container_width=True)
 
+# --- PROSES GENERATE FILE ---
 if submit:
     save_draft_file()
     
-    with st.spinner("⏳ Sedang memproses Excel dan membuat berkas, mohon tunggu..."):
+    with st.spinner("⏳ Memproses Excel & Membuat PDF F4..."):
+        data_dict = {key: st.session_state[key] for key in st.session_state}
+        
+        # 1. GENERATE EXCEL
         try:
-            ss = st.session_state
-            
-            # Hitung umur saat tombol diklik (bisa dipakai saat memasukkan ke Excel/PDF)
-            umur_lk = hitung_umur(ss.get('ttl_lk', ''))
-            umur_pr = hitung_umur(ss.get('ttl_pr', ''))
-            
             if os.path.exists(EXCEL_FILE):
                 wb = openpyxl.load_workbook(EXCEL_FILE)
-                ws = wb.active
-                
-                # Masukkan data ke Excel (Contoh)
-                # ws['A2'] = ss.get('nama_lk', '')
-                # ws['B2'] = umur_lk
-                
+                # (Pengisian cell sesuai kebutuhan Excel Anda)
                 wb.save(EXCEL_FILE)
                 wb.close()
-                st.success("✅ Data Excel berhasil diperbarui!")
-            else:
-                st.warning(f"File Excel '{EXCEL_FILE}' tidak ditemukan.")
                 
+                with open(EXCEL_FILE, "rb") as f:
+                    st.session_state['excel_bytes'] = f.read()
+            else:
+                st.warning(f"File master Excel '{EXCEL_FILE}' tidak ditemukan. Menyiapkan PDF saja.")
         except Exception as e:
-            st.error(f"❌ Terjadi kesalahan saat memproses Excel: {e}")
+            st.error(f"Error memproses Excel: {e}")
+            
+        # 2. GENERATE PDF F4
+        try:
+            pdf_bytes = generate_pdf_f4(data_dict)
+            st.session_state['pdf_bytes'] = pdf_bytes
+        except Exception as e:
+            st.error(f"Error memproses PDF F4: {e}")
+            
+        st.session_state['is_processed'] = True
+
+# --- MENAMPILKAN TOMBOL DOWNLOAD SETELAH PROSES ---
+if st.session_state.get('is_processed', False):
+    st.divider()
+    st.success("🎉 Berkas Berhasil Diproses! Silakan unduh file di bawah ini:")
+    
+    nama_lk_file = st.session_state.get('nama_lk', 'Catin').replace(" ", "_")
+    nama_pr_file = st.session_state.get('nama_pr', 'Catin').replace(" ", "_")
+    
+    col_dl1, col_dl2 = st.columns(2)
+    
+    # Tombol Download Excel
+    with col_dl1:
+        if 'excel_bytes' in st.session_state:
+            filename_excel = f"BERKAS_CATIN_{nama_lk_file}_dan_{nama_pr_file}.xlsx"
+            st.download_button(
+                label="📊 UNDUH FILE EXCEL TERBARU",
+                data=st.session_state['excel_bytes'],
+                file_name=filename_excel,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
+                use_container_width=True
+            )
+            
+    # Tombol Download PDF F4
+    with col_dl2:
+        if 'pdf_bytes' in st.session_state:
+            filename_pdf = f"RINGKASAN_CATIN_F4_{nama_lk_file}_dan_{nama_pr_file}.pdf"
+            st.download_button(
+                label="📄 UNDUH PDF F4 (1 LEMBAR)",
+                data=st.session_state['pdf_bytes'],
+                file_name=filename_pdf,
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
