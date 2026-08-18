@@ -36,7 +36,7 @@ def get_hari_tgl(tgl_obj):
     if isinstance(tgl_obj, str):
         try:
             tgl_obj = date.fromisoformat(tgl_obj)
-        except:
+        except Exception:
             return tgl_obj
     if isinstance(tgl_obj, (date, datetime)):
         nama_hari = HARI_INDONESIA.get(tgl_obj.strftime('%A'), '')
@@ -60,17 +60,22 @@ def load_draft():
         try:
             with open(DRAFT_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
+        except Exception:
             return {}
     return {}
 
 def save_draft_file():
     draft_data = {}
+    # Kunci-kunci internal Streamlit atau data binary yang harus diabaikan saat serialisasi JSON
+    ignored_keys = {'excel_bytes', 'pdf_bytes', 'is_processed'}
+    
     for key in st.session_state:
+        if key in ignored_keys:
+            continue
         val = st.session_state[key]
         if isinstance(val, (date, datetime)):
             draft_data[key] = str(val)
-        else:
+        elif isinstance(val, (str, int, float, bool, list, dict)) or val is None:
             draft_data[key] = val
             
     with open(DRAFT_FILE, "w", encoding="utf-8") as f:
@@ -78,12 +83,9 @@ def save_draft_file():
 
 # --- FUNGSI UPDATE DATA EXCEL ---
 def update_excel_data(excel_path, data):
-    # Membuka file master Excel
     wb = openpyxl.load_workbook(excel_path)
-    sheet = wb.active  # Menggunakan sheet aktif, atau pakai wb["NamaSheet"] jika ada nama khusus
+    sheet = wb.active
 
-    # PEMETAAN KEY FORM KE CELL EXCEL
-    # Ubah letak cell ('C4', 'C5', dst.) sesuai dengan koordinat cell pada template Excel Anda!
     cell_mapping = {
         'no_register': 'C4',
         'tgl_surat': 'C5',
@@ -165,7 +167,6 @@ def update_excel_data(excel_path, data):
         'saksi2_alamat': 'F51',
     }
 
-    # Penulisan nilai dari data input ke cell Excel
     for key, cell in cell_mapping.items():
         if key in data:
             val = data[key]
@@ -173,7 +174,6 @@ def update_excel_data(excel_path, data):
                 val = str(val)
             sheet[cell] = val
 
-    # Simpan workbook ke memori buffer (tanpa menimpa master jika tidak ingin)
     output_stream = BytesIO()
     wb.save(output_stream)
     wb.close()
@@ -200,7 +200,7 @@ def generate_pdf_f4(data):
         parent=styles['Heading1'],
         fontSize=10.5,
         leading=12,
-        alignment=1, # Center
+        alignment=1,
         fontName='Helvetica-Bold'
     )
     
@@ -386,7 +386,7 @@ with tab1:
         if "tgl_pelaksanaan" in draft:
             try:
                 tgl_default = date.fromisoformat(draft["tgl_pelaksanaan"])
-            except:
+            except Exception:
                 pass
         st.date_input("Tanggal Pelaksanaan Akad", value=tgl_default, key="tgl_pelaksanaan")
         st.text_input("Jam Akad", value=draft.get("jam_akad", "JAM. 08.00"), key="jam_akad")
