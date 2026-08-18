@@ -1,5 +1,6 @@
 import streamlit as st
 import openpyxl
+import re
 from io import BytesIO
 from datetime import datetime, date
 
@@ -16,7 +17,7 @@ st.set_page_config(
 )
 
 st.title("📜 Form Input Berkas Catin")
-st.caption("Aplikasi ini hanya mengisi nilai pada sheet 'ISIAN DATA'. Semua rumus dan sheet N1-N6 tetap utuh 100%.")
+st.caption("Aplikasi ini mengisi nilai pada sheet 'ISIAN DATA'. Umur dan hari akad dihitung otomatis di latar belakang.")
 
 # Membuka file Excel template utama
 EXCEL_FILE = "BERKAS CATIN .xlsx"
@@ -31,6 +32,21 @@ NAMA_HARI = {
     "Saturday": "Sabtu",
     "Sunday": "Minggu"
 }
+
+# FUNGSI HELPER HITUNG UMUR OTOMATIS
+def hitung_umur(ttl_str):
+    """
+    Menghitung umur otomatis dengan mengekstrak 4 digit tahun lahir 
+    dari teks Tempat Tanggal Lahir (contoh: 'Pemalang, 18 Februari 1999').
+    """
+    if not ttl_str:
+        return 0
+    match = re.search(r'\b(19\d{2}|20\d{2})\b', str(ttl_str))
+    if match:
+        tahun_lahir = int(match.group(1))
+        tahun_sekarang = datetime.now().year
+        return max(0, tahun_sekarang - tahun_lahir)
+    return 0
 
 # FUNGSI MEMBUAT PDF REKAP ISIAN DATA
 def generate_pdf_rekap(data_dict):
@@ -118,7 +134,7 @@ def generate_pdf_rekap(data_dict):
         # SECTION 4
         [Paragraph("7. SAKSI 1 & SAKSI 2", style_section), "", "", ""],
         [make_p("Saksi 1", True), make_p(f"{data_dict.get('G70','')} | NIK: {data_dict.get('G72','')} | TTL: {data_dict.get('G71','')} ({data_dict.get('K71','')} th) | Pekerjaan: {data_dict.get('G73','')} | Alamat: {data_dict.get('G74','')}")],
-        [make_p("Saksi 2", True), make_p(f"{data_dict.get('G76','')} | NIK: {data_dict.get('G78','')} | TTL: {data_dict.get('G77','')} | Pekerjaan: {data_dict.get('G79','')} | Alamat: {data_dict.get('G80','')}")],
+        [make_p("Saksi 2", True), make_p(f"{data_dict.get('G76','')} | NIK: {data_dict.get('G78','')} | TTL: {data_dict.get('G77','')} ({data_dict.get('K77','')} th) | Pekerjaan: {data_dict.get('G79','')} | Alamat: {data_dict.get('G80','')}")],
     ]
     
     t = Table(table_data, colWidths=[98, 189, 98, 190])
@@ -202,7 +218,6 @@ with st.form("form_catin"):
             nama_lk = st.text_input("Nama Calon Pengantin Laki-Laki", value="Miftahul Anam")
             bin_lk = st.text_input("Bin (Ayah Laki-Laki)", value="Nur Karim")
             ttl_lk = st.text_input("Tempat, Tanggal Lahir Laki-Laki", value="Pemalang, 18 Februari 1999")
-            umur_lk = st.number_input("Umur Laki-Laki", value=27)
             nik_lk = st.text_input("NIK Laki-Laki", value="3327031802990004")
         with col_lk2:
             pekerjaan_lk = st.text_input("Pekerjaan Laki-Laki", value="Swasta")
@@ -221,7 +236,6 @@ with st.form("form_catin"):
             bin_ayah_lk = st.text_input("bin (Kakek Laki-Laki)", value="Kasturi")
             nik_ayah_lk = st.text_input("NIK Ayah Laki-Laki", value="3327030608680006")
             ttl_ayah_lk = st.text_input("TTL Ayah Laki-Laki", value="Pemalang, 06 Agustus 1968")
-            umur_ayah_lk = st.number_input("Umur Ayah Laki-Laki", value=58)
             pekerjaan_ayah_lk = st.text_input("Pekerjaan Ayah Laki-Laki", value="PETANI/ PEKEBUN")
             alamat_ayah_lk = st.text_area("Alamat Ayah Laki-Laki", value="RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang")
 
@@ -231,7 +245,6 @@ with st.form("form_catin"):
             bin_ibu_lk = st.text_input("bin (Kakek dari Ibu Laki-Laki)", value="Taryad")
             nik_ibu_lk = st.text_input("NIK Ibu Laki-Laki", value="3327035405740004")
             ttl_ibu_lk = st.text_input("TTL Ibu Laki-Laki", value="Pemalang, 14 Mei 1974")
-            umur_ibu_lk = st.number_input("Umur Ibu Laki-Laki", value=52)
             pekerjaan_ibu_lk = st.text_input("Pekerjaan Ibu Laki-Laki", value="Mengurus Rumah Tangga")
             alamat_ibu_lk = st.text_area("Alamat Ibu Laki-Laki", value="RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang")
 
@@ -242,7 +255,6 @@ with st.form("form_catin"):
             nama_pr = st.text_input("Nama Calon Pengantin Perempuan", value="Diyan Solehatin")
             binti_pr = st.text_input("Binti (Ayah Perempuan)", value="Disun")
             ttl_pr = st.text_input("Tempat, Tanggal Lahir Perempuan", value="Pemalang, 29 Juni 2007")
-            umur_pr = st.number_input("Umur Perempuan", value=19)
             nik_pr = st.text_input("NIK Perempuan", value="3327046906070010")
         with col_pr2:
             pekerjaan_pr = st.text_input("Pekerjaan Perempuan", value="BELUM/ TIDAK BEKERJA")
@@ -261,7 +273,6 @@ with st.form("form_catin"):
             bin_ayah_pr = st.text_input("bin (Kakek Perempuan)", value="Tawiroji")
             nik_ayah_pr = st.text_input("NIK Ayah Perempuan", value="3327042504840003")
             ttl_ayah_pr = st.text_input("TTL Ayah Perempuan", value="Pemalang, 21 April 1984")
-            umur_ayah_pr = st.number_input("Umur Ayah Perempuan", value=42)
             pekerjaan_ayah_pr = st.text_input("Pekerjaan Ayah Perempuan", value="PETANI/ PEKEBUN")
             alamat_ayah_pr = st.text_area("Alamat Ayah Perempuan", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
@@ -271,7 +282,6 @@ with st.form("form_catin"):
             bin_ibu_pr = st.text_input("bin (Kakek dari Ibu Perempuan)", value="Tamiarjo")
             nik_ibu_pr = st.text_input("NIK Ibu Perempuan", value="3327044411840003")
             ttl_ibu_pr = st.text_input("TTL Ibu Perempuan", value="Pemalang, 04 November 1984")
-            umur_ibu_pr = st.number_input("Umur Ibu Perempuan", value=42)
             pekerjaan_ibu_pr = st.text_input("Pekerjaan Ibu Perempuan", value="Mengurus Rumah Tangga")
             alamat_ibu_pr = st.text_area("Alamat Ibu Perempuan", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
@@ -283,7 +293,6 @@ with st.form("form_catin"):
             bin_wali = st.text_input("Bin Wali", value="Tawiroji")
             nik_wali = st.text_input("NIK Wali", value="3327042504840003")
             ttl_wali = st.text_input("TTL Wali", value="Pemalang, 21 April 1984")
-            umur_wali = st.number_input("Umur Wali", value=42)
         with col_w2:
             pekerjaan_wali = st.text_input("Pekerjaan Wali", value="PETANI/ PEKEBUN")
             alamat_wali = st.text_area("Alamat Wali", value="RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
@@ -296,7 +305,6 @@ with st.form("form_catin"):
             st.subheader("Data Saksi 1")
             saksi1_nama = st.text_input("Nama Saksi 1", value="Chalim Muchtarom")
             saksi1_ttl = st.text_input("TTL Saksi 1", value="Pemalang, 21 Oktober 1989")
-            saksi1_umur = st.number_input("Umur Saksi 1", value=37)
             saksi1_nik = st.text_input("NIK Saksi 1", value="3327042110890004")
             saksi1_pekerjaan = st.text_input("Pekerjaan Saksi 1", value="Perangkat Desa")
             saksi1_alamat = st.text_area("Alamat Saksi 1", value="RT 002 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
@@ -304,10 +312,10 @@ with st.form("form_catin"):
         with col_s2:
             st.subheader("Data Saksi 2")
             saksi2_nama = st.text_input("Nama Saksi 2", value="Sidin")
-            saksi2_ttl = st.text_input("TTL Saksi 2", value="Pemalang, ")
-            saksi2_nik = st.text_input("NIK Saksi 2", value="0000000000000000")
-            saksi2_pekerjaan = st.text_input("Pekerjaan Saksi 2", value="")
-            saksi2_alamat = st.text_area("Alamat Saksi 2", value="")
+            saksi2_ttl = st.text_input("TTL Saksi 2", value="Pemalang, 15 Mei 1980")
+            saksi2_nik = st.text_input("NIK Saksi 2", value="3327041505800002")
+            saksi2_pekerjaan = st.text_input("Pekerjaan Saksi 2", value="Petani/Pekebun")
+            saksi2_alamat = st.text_area("Alamat Saksi 2", value="RT 003 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang")
 
     submit = st.form_submit_button("💾 ISIKAN KE EXCEL & GENERATE BERKAS")
 
@@ -317,6 +325,17 @@ if submit:
         sheet = wb['ISIAN DATA']
 
         hari_akad = NAMA_HARI.get(tgl_pelaksanaan.strftime("%A"), "")
+
+        # HITUNG UMUR OTOMATIS SAAT SUBMIT
+        umur_lk = hitung_umur(ttl_lk)
+        umur_ayah_lk = hitung_umur(ttl_ayah_lk)
+        umur_ibu_lk = hitung_umur(ttl_ibu_lk)
+        umur_pr = hitung_umur(ttl_pr)
+        umur_ayah_pr = hitung_umur(ttl_ayah_pr)
+        umur_ibu_pr = hitung_umur(ttl_ibu_pr)
+        umur_wali = hitung_umur(ttl_wali)
+        saksi1_umur = hitung_umur(saksi1_ttl)
+        saksi2_umur = hitung_umur(saksi2_ttl)
 
         cell_updates = {
             'G2': no_register,
@@ -393,6 +412,7 @@ if submit:
             'G74': saksi1_alamat,
             'G76': saksi2_nama,
             'G77': saksi2_ttl,
+            'K77': saksi2_umur,
             'G78': saksi2_nik,
             'G79': saksi2_pekerjaan,
             'G80': saksi2_alamat,
@@ -407,7 +427,7 @@ if submit:
 
         output_pdf = generate_pdf_rekap(cell_updates)
 
-        st.success("✅ Success! Data berhasil diisikan ke sheet ISIAN DATA. Semua rumus antar sheet tetap bekerja 100% sempurna.")
+        st.success("✅ Success! Data berhasil diisikan ke sheet ISIAN DATA. Umur telah dihitung otomatis.")
         
         filename_base = f"BERKAS_CATIN_{nama_lk}_{nama_pr}".replace(" ", "_")
         
