@@ -76,13 +76,114 @@ def save_draft_file():
     with open(DRAFT_FILE, "w", encoding="utf-8") as f:
         json.dump(draft_data, f, ensure_ascii=False, indent=2)
 
+# --- FUNGSI UPDATE DATA EXCEL ---
+def update_excel_data(excel_path, data):
+    # Membuka file master Excel
+    wb = openpyxl.load_workbook(excel_path)
+    sheet = wb.active  # Menggunakan sheet aktif, atau pakai wb["NamaSheet"] jika ada nama khusus
+
+    # PEMETAAN KEY FORM KE CELL EXCEL
+    # Ubah letak cell ('C4', 'C5', dst.) sesuai dengan koordinat cell pada template Excel Anda!
+    cell_mapping = {
+        'no_register': 'C4',
+        'tgl_surat': 'C5',
+        'tgl_pelaksanaan': 'C6',
+        'jam_akad': 'C7',
+        'tempat_akad': 'C8',
+        'email_catin': 'C9',
+        'mahar': 'C10',
+
+        'nama_lk': 'C13',
+        'bin_lk': 'C14',
+        'ttl_lk': 'C15',
+        'nik_lk': 'C16',
+        'pekerjaan_lk': 'C17',
+        'status_lk': 'C18',
+        'jk_lk': 'C19',
+        'istri_terdahulu': 'C20',
+        'alamat_lk': 'C21',
+        'pendidikan_lk': 'C22',
+
+        'nama_ayah_lk': 'C25',
+        'bin_ayah_lk': 'C26',
+        'nik_ayah_lk': 'C27',
+        'ttl_ayah_lk': 'C28',
+        'pekerjaan_ayah_lk': 'C29',
+        'alamat_ayah_lk': 'C30',
+
+        'nama_ibu_lk': 'C33',
+        'bin_ibu_lk': 'C34',
+        'nik_ibu_lk': 'C35',
+        'ttl_ibu_lk': 'C36',
+        'pekerjaan_ibu_lk': 'C37',
+        'alamat_ibu_lk': 'C38',
+
+        'nama_pr': 'F13',
+        'binti_pr': 'F14',
+        'ttl_pr': 'F15',
+        'nik_pr': 'F16',
+        'pekerjaan_pr': 'F17',
+        'status_pr': 'F18',
+        'jk_pr': 'F19',
+        'suami_terdahulu': 'F20',
+        'alamat_pr': 'F21',
+        'pendidikan_pr': 'F22',
+
+        'nama_ayah_pr': 'F25',
+        'bin_ayah_pr': 'F26',
+        'nik_ayah_pr': 'F27',
+        'ttl_ayah_pr': 'F28',
+        'pekerjaan_ayah_pr': 'F29',
+        'alamat_ayah_pr': 'F30',
+
+        'nama_ibu_pr': 'F33',
+        'bin_ibu_pr': 'F34',
+        'nik_ibu_pr': 'F35',
+        'ttl_ibu_pr': 'F36',
+        'pekerjaan_ibu_pr': 'F37',
+        'alamat_ibu_pr': 'F38',
+
+        'nama_wali': 'C41',
+        'bin_wali': 'C42',
+        'nik_wali': 'C43',
+        'ttl_wali': 'C44',
+        'pekerjaan_wali': 'C45',
+        'alamat_wali': 'C46',
+        'hubungan_wali': 'C47',
+        'nama_wali_lengkap': 'C48',
+
+        'saksi1_nama': 'F41',
+        'saksi1_ttl': 'F42',
+        'saksi1_nik': 'F43',
+        'saksi1_pekerjaan': 'F44',
+        'saksi1_alamat': 'F45',
+
+        'saksi2_nama': 'F47',
+        'saksi2_ttl': 'F48',
+        'saksi2_nik': 'F49',
+        'saksi2_pekerjaan': 'F50',
+        'saksi2_alamat': 'F51',
+    }
+
+    # Penulisan nilai dari data input ke cell Excel
+    for key, cell in cell_mapping.items():
+        if key in data:
+            val = data[key]
+            if isinstance(val, (date, datetime)):
+                val = str(val)
+            sheet[cell] = val
+
+    # Simpan workbook ke memori buffer (tanpa menimpa master jika tidak ingin)
+    output_stream = BytesIO()
+    wb.save(output_stream)
+    wb.close()
+    return output_stream.getvalue()
+
 # --- FUNGSI GENERATE PDF F4 LENGKAP (1 LEMBAR) ---
 def generate_pdf_f4(data):
     buffer = BytesIO()
-    # Ukuran F4 / Folio: 215mm x 330mm
     f4_size = (215 * mm, 330 * mm)
     
-    # Margin hemat (7mm) agar semua data & tanda tangan muat 1 lembar utuh
     doc = SimpleDocTemplate(
         buffer,
         pagesize=f4_size,
@@ -116,24 +217,20 @@ def generate_pdf_f4(data):
     
     elements = []
     
-    # KOP / JUDUL DOKUMEN
     elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG - KECAMATAN WATUKUMPUL", ParagraphStyle('Kop1', fontSize=7.5, alignment=1, fontName='Helvetica-Bold')))
     elements.append(Paragraph("RINGKASAN LEMBAR VERIFIKASI BERKAS CALON PENGANTIN DESA TAMBI", title_style))
     elements.append(Paragraph(f"No. Register: <b>{data.get('no_register', '-')}</b> | Tanggal Surat: <b>{data.get('tgl_surat', '-')}</b>", ParagraphStyle('SubTitle', fontSize=7.5, alignment=1, leading=9)))
     elements.append(Spacer(1, 3))
     
-    # Helper baris tabel tunggal
     def row1(lbl, val):
         return [Paragraph(lbl, lbl_style), Paragraph(":", lbl_style), Paragraph(str(val or '-'), val_style)]
 
-    # Helper baris tabel ganda (LK & PR side by side)
     def row2(lbl1, val1, lbl2, val2):
         return [
             Paragraph(lbl1, lbl_style), Paragraph(":", lbl_style), Paragraph(str(val1 or '-'), val_style),
             Paragraph(lbl2, lbl_style), Paragraph(":", lbl_style), Paragraph(str(val2 or '-'), val_style)
         ]
 
-    # I. PELAKSANAAN AKAD NIKAH
     hari_tgl_akad = f"{get_hari_tgl(data.get('tgl_pelaksanaan', '-'))} (Jam: {data.get('jam_akad', '-')})"
     tabel_akad_data = [
         [Paragraph("I. PELAKSANAAN AKAD NIKAH", sec_title_style), "", ""],
@@ -143,7 +240,6 @@ def generate_pdf_f4(data):
         row1("Email Catin", data.get('email_catin', '-')),
     ]
 
-    # II & III. CATIN LAKI-LAKI & PEREMPUAN
     tabel_catin_data = [
         [Paragraph("II. CALON PENGANTIN LAKI-LAKI", sec_title_style), "", "", Paragraph("III. CALON PENGANTIN PEREMPUAN", sec_title_style), "", ""],
         row2("Nama Lengkap", data.get('nama_lk','-'), "Nama Lengkap", data.get('nama_pr','-')),
@@ -158,7 +254,6 @@ def generate_pdf_f4(data):
         row2("Alamat Lengkap", data.get('alamat_lk','-'), "Alamat Lengkap", data.get('alamat_pr','-')),
     ]
 
-    # IV & V. ORANG TUA LAKI-LAKI & PEREMPUAN
     tabel_ortu_data = [
         [Paragraph("IV. ORANG TUA LAKI-LAKI", sec_title_style), "", "", Paragraph("V. ORANG TUA PEREMPUAN", sec_title_style), "", ""],
         row2("Ayah / Bin", f"{data.get('nama_ayah_lk','-')} bin {data.get('bin_ayah_lk','-')}", "Ayah / Bin", f"{data.get('nama_ayah_pr','-')} bin {data.get('bin_ayah_pr','-')}"),
@@ -171,7 +266,6 @@ def generate_pdf_f4(data):
         row2("Alamat Ibu", data.get('alamat_ibu_lk','-'), "Alamat Ibu", data.get('alamat_ibu_pr','-')),
     ]
 
-    # VI & VII. WALI NIKAH & SAKSI-SAKSI
     tabel_wali_saksi = [
         [Paragraph("VI. DATA WALI NIKAH", sec_title_style), "", "", Paragraph("VII. DATA SAKSI-SAKSI AKAD", sec_title_style), "", ""],
         row2("Nama Wali", f"{data.get('nama_wali','-')} bin {data.get('bin_wali','-')}", "Saksi 1", data.get('saksi1_nama','-')),
@@ -212,7 +306,6 @@ def generate_pdf_f4(data):
         t4, Spacer(1, 6)
     ])
     
-    # 1. KOTAK TANDA TANGAN CATIN & WALI
     ttd_catin = [
         [Paragraph("Catin Laki-Laki", lbl_style), Paragraph("Catin Perempuan", lbl_style), Paragraph("Wali Nikah", lbl_style)],
         [Spacer(1, 14), Spacer(1, 14), Spacer(1, 14)],
@@ -230,7 +323,6 @@ def generate_pdf_f4(data):
         ('TOPPADDING', (0,0), (-1,-1), 0),
     ]))
     
-    # 2. KOTAK TANDA TANGAN KEPALA DESA & KASI PELAYANAN
     tgl_surat_str = data.get('tgl_surat', 'Tambi, ................. 2026')
     ttd_pemdes = [
         [
@@ -448,15 +540,11 @@ if submit:
     with st.spinner("⏳ Memproses Excel & Membuat PDF F4 Lengkap dengan Pengesahan Kades & Kasi..."):
         data_dict = {key: st.session_state[key] for key in st.session_state}
         
-        # 1. GENERATE EXCEL
+        # 1. GENERATE EXCEL DENGAN MENULISKAN DATA KE CELL
         try:
             if os.path.exists(EXCEL_FILE):
-                wb = openpyxl.load_workbook(EXCEL_FILE)
-                wb.save(EXCEL_FILE)
-                wb.close()
-                
-                with open(EXCEL_FILE, "rb") as f:
-                    st.session_state['excel_bytes'] = f.read()
+                excel_bytes = update_excel_data(EXCEL_FILE, data_dict)
+                st.session_state['excel_bytes'] = excel_bytes
             else:
                 st.warning(f"File master Excel '{EXCEL_FILE}' tidak ditemukan di folder. Menyiapkan PDF saja.")
         except Exception as e:
