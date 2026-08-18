@@ -66,7 +66,6 @@ def load_draft():
 
 def save_draft_file():
     draft_data = {}
-    # Kunci-kunci internal Streamlit atau data binary yang harus diabaikan saat serialisasi JSON
     ignored_keys = {'excel_bytes', 'pdf_bytes', 'is_processed'}
     
     for key in st.session_state:
@@ -379,7 +378,7 @@ with tab1:
     st.subheader("Surat & Pelaksanaan Akad Nikah")
     col1, col2 = st.columns(2)
     with col1:
-        st.text_input("Nomor Register", value=draft.get("no_register", "400.12.3.2/010/ VIII/ 2026"), key="no_register")
+        st.text_input("Nomor Register", value=draft.get("no_register", "400.12.3.2/010/VIII/2026"), key="no_register")
         st.text_input("Tanggal Surat", value=draft.get("tgl_surat", "TAMBI, 11 AGUSTUS 2026"), key="tgl_surat")
         
         tgl_default = date(2026, 9, 7)
