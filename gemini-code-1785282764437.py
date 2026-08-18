@@ -21,6 +21,28 @@ st.set_page_config(
 EXCEL_FILE = "BERKAS CATIN .xlsx"
 DRAFT_FILE = "draf_terakhir.json"
 
+# --- FUNGSI HARI INDONESIA ---
+HARI_INDONESIA = {
+    'Monday': 'Senin',
+    'Tuesday': 'Selasa',
+    'Wednesday': 'Rabu',
+    'Thursday': 'Kamis',
+    'Friday': 'Jumat',
+    'Saturday': 'Sabtu',
+    'Sunday': 'Minggu'
+}
+
+def get_hari_tgl(tgl_obj):
+    if isinstance(tgl_obj, str):
+        try:
+            tgl_obj = date.fromisoformat(tgl_obj)
+        except:
+            return tgl_obj
+    if isinstance(tgl_obj, (date, datetime)):
+        nama_hari = HARI_INDONESIA.get(tgl_obj.strftime('%A'), '')
+        return f"{nama_hari}, {tgl_obj.strftime('%d-%m-%Y')}"
+    return str(tgl_obj)
+
 # --- FUNGSI RUMUS HITUNG UMUR ---
 def hitung_umur(ttl_str):
     if not ttl_str:
@@ -54,125 +76,158 @@ def save_draft_file():
     with open(DRAFT_FILE, "w", encoding="utf-8") as f:
         json.dump(draft_data, f, ensure_ascii=False, indent=2)
 
-# --- FUNGSI GENERATE PDF F4 (1 LEMBAR) ---
+# --- FUNGSI GENERATE PDF F4 LENGKAP (1 LEMBAR) ---
 def generate_pdf_f4(data):
     buffer = BytesIO()
     # Ukuran F4 / Folio: 215mm x 330mm
     f4_size = (215 * mm, 330 * mm)
     
-    # Margin hemat (10mm) agar pas 1 lembar F4
+    # Margin hemat (8mm) agar semua data muat 1 lembar utuh
     doc = SimpleDocTemplate(
         buffer,
         pagesize=f4_size,
-        leftMargin=10 * mm,
-        rightMargin=10 * mm,
-        topMargin=10 * mm,
-        bottomMargin=10 * mm
+        leftMargin=8 * mm,
+        rightMargin=8 * mm,
+        topMargin=8 * mm,
+        bottomMargin=8 * mm
     )
     
     styles = getSampleStyleSheet()
+    
     title_style = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=12,
-        leading=14,
+        fontSize=11,
+        leading=13,
         alignment=1, # Center
         fontName='Helvetica-Bold'
     )
     
-    label_style = ParagraphStyle('LabelStyle', fontSize=8, leading=10, fontName='Helvetica-Bold')
-    val_style = ParagraphStyle('ValStyle', fontSize=8, leading=10, fontName='Helvetica')
+    sec_title_style = ParagraphStyle(
+        'SecTitleStyle',
+        fontSize=8.5,
+        leading=10,
+        fontName='Helvetica-Bold',
+        textColor=colors.HexColor('#003366')
+    )
+    
+    lbl_style = ParagraphStyle('LblStyle', fontSize=7.5, leading=9, fontName='Helvetica-Bold')
+    val_style = ParagraphStyle('ValStyle', fontSize=7.5, leading=9, fontName='Helvetica')
     
     elements = []
     
-    # Judul Dokumen
-    elements.append(Paragraph("RINGKASAN BERKAS CALON PENGANTIN - DESA TAMBI", title_style))
-    elements.append(Paragraph(f"No. Reg: {data.get('no_register', '-')} | Tgl Surat: {data.get('tgl_surat', '-')}", ParagraphStyle('SubTitle', fontSize=9, alignment=1, leading=11)))
-    elements.append(Spacer(1, 8))
+    # KOP / JUDUL DOKUMEN
+    elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG - KECAMATAN WATUKUMPUL", ParagraphStyle('Kop1', fontSize=8, alignment=1, fontName='Helvetica-Bold')))
+    elements.append(Paragraph("RINGKASAN LEMBAR VERIFIKASI BERKAS CALON PENGANTIN DESA TAMBI", title_style))
+    elements.append(Paragraph(f"No. Register: <b>{data.get('no_register', '-')}</b> | Tanggal Surat: <b>{data.get('tgl_surat', '-')}</b>", ParagraphStyle('SubTitle', fontSize=8, alignment=1, leading=10)))
+    elements.append(Spacer(1, 4))
     
-    # Helper untuk format baris tabel
-    def make_row(lbl, val):
-        return [Paragraph(lbl, label_style), Paragraph(":", label_style), Paragraph(str(val or '-'), val_style)]
+    # Helper baris tabel tunggal
+    def row1(lbl, val):
+        return [Paragraph(lbl, lbl_style), Paragraph(":", lbl_style), Paragraph(str(val or '-'), val_style)]
 
-    # Section 1: Pelaksanaan Akad
+    # Helper baris tabel ganda (LK & PR side by side)
+    def row2(lbl1, val1, lbl2, val2):
+        return [
+            Paragraph(lbl1, lbl_style), Paragraph(":", lbl_style), Paragraph(str(val1 or '-'), val_style),
+            Paragraph(lbl2, lbl_style), Paragraph(":", lbl_style), Paragraph(str(val2 or '-'), val_style)
+        ]
+
+    # I. PELAKSANAAN AKAD NIKAH (TERMASUK HARI AKAD)
+    hari_tgl_akad = f"{get_hari_tgl(data.get('tgl_pelaksanaan', '-'))} (Jam: {data.get('jam_akad', '-')})"
     tabel_akad_data = [
-        [Paragraph("<b>I. PELAKSANAAN AKAD NIKAH</b>", label_style), "", ""],
-        make_row("Tgl / Jam Akad", f"{data.get('tgl_pelaksanaan', '-')} / {data.get('jam_akad', '-')}"),
-        make_row("Tempat Akad", data.get('tempat_akad', '-')),
-        make_row("Mahar / Maskawin", data.get('mahar', '-')),
+        [Paragraph("I. PELAKSANAAN AKAD NIKAH", sec_title_style), "", ""],
+        row1("Hari & Tgl / Jam Akad", hari_tgl_akad),
+        row1("Tempat Akad Nikah", data.get('tempat_akad', '-')),
+        row1("Maskawin / Mahar", data.get('mahar', '-')),
+        row1("Email Catin", data.get('email_catin', '-')),
     ]
-    
-    # Section 2: Data Catin LK & PR
+
+    # II & III. CATIN LAKI-LAKI & PEREMPUAN (LENGKAP TTL & ALAMAT)
     tabel_catin_data = [
-        [Paragraph("<b>II. CATIN LAKI-LAKI</b>", label_style), "", "", Paragraph("<b>III. CATIN PEREMPUAN</b>", label_style), "", ""],
-        [Paragraph("Nama", label_style), Paragraph(":", label_style), Paragraph(data.get('nama_lk','-'), val_style),
-         Paragraph("Nama", label_style), Paragraph(":", label_style), Paragraph(data.get('nama_pr','-'), val_style)],
-        [Paragraph("Bin", label_style), Paragraph(":", label_style), Paragraph(data.get('bin_lk','-'), val_style),
-         Paragraph("Binti", label_style), Paragraph(":", label_style), Paragraph(data.get('binti_pr','-'), val_style)],
-        [Paragraph("NIK", label_style), Paragraph(":", label_style), Paragraph(data.get('nik_lk','-'), val_style),
-         Paragraph("NIK", label_style), Paragraph(":", label_style), Paragraph(data.get('nik_pr','-'), val_style)],
-        [Paragraph("TTL / Umur", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('ttl_lk','-')} ({hitung_umur(data.get('ttl_lk'))} Thn)", val_style),
-         Paragraph("TTL / Umur", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('ttl_pr','-')} ({hitung_umur(data.get('ttl_pr'))} Thn)", val_style)],
-        [Paragraph("Pekerjaan", label_style), Paragraph(":", label_style), Paragraph(data.get('pekerjaan_lk','-'), val_style),
-         Paragraph("Pekerjaan", label_style), Paragraph(":", label_style), Paragraph(data.get('pekerjaan_pr','-'), val_style)],
-        [Paragraph("Alamat", label_style), Paragraph(":", label_style), Paragraph(data.get('alamat_lk','-'), val_style),
-         Paragraph("Alamat", label_style), Paragraph(":", label_style), Paragraph(data.get('alamat_pr','-'), val_style)],
+        [Paragraph("II. CALON PENGANTIN LAKI-LAKI", sec_title_style), "", "", Paragraph("III. CALON PENGANTIN PEREMPUAN", sec_title_style), "", ""],
+        row2("Nama Lengkap", data.get('nama_lk','-'), "Nama Lengkap", data.get('nama_pr','-')),
+        row2("Bin / Binti", data.get('bin_lk','-'), "Bin / Binti", data.get('binti_pr','-')),
+        row2("NIK", data.get('nik_lk','-'), "NIK", data.get('nik_pr','-')),
+        row2("Tempat, Tgl Lahir", data.get('ttl_lk','-'), "Tempat, Tgl Lahir", data.get('ttl_pr','-')),
+        row2("Umur Catin", f"{hitung_umur(data.get('ttl_lk'))} Tahun", "Umur Catin", f"{hitung_umur(data.get('ttl_pr'))} Tahun"),
+        row2("Status / Gender", f"{data.get('status_lk','-')} / {data.get('jk_lk','-')}", "Status / Gender", f"{data.get('status_pr','-')} / {data.get('jk_pr','-')}"),
+        row2("Pekerjaan", data.get('pekerjaan_lk','-'), "Pekerjaan", data.get('pekerjaan_pr','-')),
+        row2("Pendidikan", data.get('pendidikan_lk','-'), "Pendidikan", data.get('pendidikan_pr','-')),
+        row2("Ex Pasangan", data.get('istri_terdahulu','-'), "Ex Pasangan", data.get('suami_terdahulu','-')),
+        row2("Alamat Lengkap", data.get('alamat_lk','-'), "Alamat Lengkap", data.get('alamat_pr','-')),
     ]
 
-    # Section 3: Orang Tua
+    # IV & V. ORANG TUA LAKI-LAKI & PEREMPUAN (LENGKAP TTL, NIK, ALAMAT)
     tabel_ortu_data = [
-        [Paragraph("<b>IV. ORANG TUA LAKI-LAKI</b>", label_style), "", "", Paragraph("<b>V. ORANG TUA PEREMPUAN</b>", label_style), "", ""],
-        [Paragraph("Ayah", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ayah_lk','-')} (NIK: {data.get('nik_ayah_lk','-')})", val_style),
-         Paragraph("Ayah", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ayah_pr','-')} (NIK: {data.get('nik_ayah_pr','-')})", val_style)],
-        [Paragraph("Ibu", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ibu_lk','-')} (NIK: {data.get('nik_ibu_lk','-')})", val_style),
-         Paragraph("Ibu", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_ibu_pr','-')} (NIK: {data.get('nik_ibu_pr','-')})", val_style)],
+        [Paragraph("IV. ORANG TUA LAKI-LAKI", sec_title_style), "", "", Paragraph("V. ORANG TUA PEREMPUAN", sec_title_style), "", ""],
+        row2("Ayah / Bin", f"{data.get('nama_ayah_lk','-')} bin {data.get('bin_ayah_lk','-')}", "Ayah / Bin", f"{data.get('nama_ayah_pr','-')} bin {data.get('bin_ayah_pr','-')}"),
+        row2("NIK / TTL Ayah", f"{data.get('nik_ayah_lk','-')} / {data.get('ttl_ayah_lk','-')}", "NIK / TTL Ayah", f"{data.get('nik_ayah_pr','-')} / {data.get('ttl_ayah_pr','-')}"),
+        row2("Pekerjaan Ayah", data.get('pekerjaan_ayah_lk','-'), "Pekerjaan Ayah", data.get('pekerjaan_ayah_pr','-')),
+        row2("Alamat Ayah", data.get('alamat_ayah_lk','-'), "Alamat Ayah", data.get('alamat_ayah_pr','-')),
+        row2("Ibu / Binti", f"{data.get('nama_ibu_lk','-')} bin {data.get('bin_ibu_lk','-')}", "Ibu / Binti", f"{data.get('nama_ibu_pr','-')} bin {data.get('bin_ibu_pr','-')}"),
+        row2("NIK / TTL Ibu", f"{data.get('nik_ibu_lk','-')} / {data.get('ttl_ibu_lk','-')}", "NIK / TTL Ibu", f"{data.get('nik_ibu_pr','-')} / {data.get('ttl_ibu_pr','-')}"),
+        row2("Pekerjaan Ibu", data.get('pekerjaan_ibu_lk','-'), "Pekerjaan Ibu", data.get('pekerjaan_ibu_pr','-')),
+        row2("Alamat Ibu", data.get('alamat_ibu_lk','-'), "Alamat Ibu", data.get('alamat_ibu_pr','-')),
     ]
 
-    # Section 4: Wali & Saksi
+    # VI & VII. WALI NIKAH & SAKSI-SAKSI
     tabel_wali_saksi = [
-        [Paragraph("<b>VI. DATA WALI NIKAH</b>", label_style), "", "", Paragraph("<b>VII. DATA SAKSI-SAKSI</b>", label_style), "", ""],
-        [Paragraph("Nama Wali", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('nama_wali','-')} bin {data.get('bin_wali','-')}", val_style),
-         Paragraph("Saksi 1", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('saksi1_nama','-')} (NIK: {data.get('saksi1_nik','-')})", val_style)],
-        [Paragraph("Hubungan", label_style), Paragraph(":", label_style), Paragraph(data.get('hubungan_wali','-'), val_style),
-         Paragraph("Saksi 2", label_style), Paragraph(":", label_style), Paragraph(f"{data.get('saksi2_nama','-')} (NIK: {data.get('saksi2_nik','-')})", val_style)],
-        [Paragraph("NIK Wali", label_style), Paragraph(":", label_style), Paragraph(data.get('nik_wali','-'), val_style),
-         Paragraph("", label_style), Paragraph("", label_style), Paragraph("", val_style)],
+        [Paragraph("VI. DATA WALI NIKAH", sec_title_style), "", "", Paragraph("VII. DATA SAKSI-SAKSI AKAD", sec_title_style), "", ""],
+        row2("Nama Wali", f"{data.get('nama_wali','-')} bin {data.get('bin_wali','-')}", "Saksi 1", data.get('saksi1_nama','-')),
+        row2("NIK / TTL Wali", f"{data.get('nik_wali','-')} / {data.get('ttl_wali','-')}", "NIK / TTL Saksi 1", f"{data.get('saksi1_nik','-')} / {data.get('saksi1_ttl','-')}"),
+        row2("Hubungan Wali", data.get('hubungan_wali','-'), "Pekerjaan Saksi 1", data.get('saksi1_pekerjaan','-')),
+        row2("Pekerjaan Wali", data.get('pekerjaan_wali','-'), "Alamat Saksi 1", data.get('saksi1_alamat','-')),
+        row2("Alamat Wali", data.get('alamat_wali','-'), "Saksi 2", data.get('saksi2_nama','-')),
+        row2("Wali Lengkap", data.get('nama_wali_lengkap','-'), "NIK / TTL Saksi 2", f"{data.get('saksi2_nik','-')} / {data.get('saksi2_ttl','-')}"),
+        row2("", "", "Pekerjaan Saksi 2", data.get('saksi2_pekerjaan','-')),
+        row2("", "", "Alamat Saksi 2", data.get('saksi2_alamat','-')),
     ]
 
     style_table = TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1),
-        ('TOPPADDING', (0,0), (-1,-1), 1),
-        ('LEFTPADDING', (0,0), (-1,-1), 2),
-        ('RIGHTPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0.5),
+        ('TOPPADDING', (0,0), (-1,-1), 0.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 1),
+        ('RIGHTPADDING', (0,0), (-1,-1), 1),
+        ('LINEBELOW', (0,0), (-1,0), 0.5, colors.HexColor('#CCCCCC')),
     ])
 
-    t1 = Table(tabel_akad_data, colWidths=[30*mm, 5*mm, 160*mm])
+    t1 = Table(tabel_akad_data, colWidths=[35*mm, 4*mm, 160*mm])
     t1.setStyle(style_table)
     
-    t2 = Table(tabel_catin_data, colWidths=[25*mm, 4*mm, 66*mm, 25*mm, 4*mm, 66*mm])
+    t2 = Table(tabel_catin_data, colWidths=[27*mm, 3*mm, 69*mm, 27*mm, 3*mm, 69*mm])
     t2.setStyle(style_table)
 
-    t3 = Table(tabel_ortu_data, colWidths=[25*mm, 4*mm, 66*mm, 25*mm, 4*mm, 66*mm])
+    t3 = Table(tabel_ortu_data, colWidths=[27*mm, 3*mm, 69*mm, 27*mm, 3*mm, 69*mm])
     t3.setStyle(style_table)
 
-    t4 = Table(tabel_wali_saksi, colWidths=[25*mm, 4*mm, 66*mm, 25*mm, 4*mm, 66*mm])
+    t4 = Table(tabel_wali_saksi, colWidths=[27*mm, 3*mm, 69*mm, 27*mm, 3*mm, 69*mm])
     t4.setStyle(style_table)
 
-    elements.extend([t1, Spacer(1, 6), t2, Spacer(1, 6), t3, Spacer(1, 6), t4, Spacer(1, 15)])
+    elements.extend([
+        t1, Spacer(1, 3), 
+        t2, Spacer(1, 3), 
+        t3, Spacer(1, 3), 
+        t4, Spacer(1, 8)
+    ])
     
-    # Kolom Tanda Tangan
+    # KOTAK TANDA TANGAN
     ttd_data = [
-        [Paragraph("Catin Laki-Laki", label_style), Paragraph("Catin Perempuan", label_style), Paragraph("Wali Nikah", label_style)],
-        [Spacer(1, 25), Spacer(1, 25), Spacer(1, 25)],
-        [Paragraph(f"( <b>{data.get('nama_lk','...')}</b> )", val_style), 
-         Paragraph(f"( <b>{data.get('nama_pr','...')}</b> )", val_style), 
-         Paragraph(f"( <b>{data.get('nama_wali','...')}</b> )", val_style)]
+        [Paragraph("Catin Laki-Laki", lbl_style), Paragraph("Catin Perempuan", lbl_style), Paragraph("Wali Nikah", lbl_style)],
+        [Spacer(1, 16), Spacer(1, 16), Spacer(1, 16)],
+        [
+            Paragraph(f"( <b>{data.get('nama_lk','...')}</b> )", val_style), 
+            Paragraph(f"( <b>{data.get('nama_pr','...')}</b> )", val_style), 
+            Paragraph(f"( <b>{data.get('nama_wali','...')}</b> )", val_style)
+        ]
     ]
-    t_ttd = Table(ttd_data, colWidths=[65*mm, 65*mm, 65*mm])
+    t_ttd = Table(ttd_data, colWidths=[66*mm, 66*mm, 66*mm])
     t_ttd.setStyle(TableStyle([
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
     ]))
     
     elements.append(t_ttd)
@@ -367,21 +422,20 @@ with col_act2:
 if submit:
     save_draft_file()
     
-    with st.spinner("⏳ Memproses Excel & Membuat PDF F4..."):
+    with st.spinner("⏳ Memproses Excel & Membuat PDF F4 Lengkap..."):
         data_dict = {key: st.session_state[key] for key in st.session_state}
         
         # 1. GENERATE EXCEL
         try:
             if os.path.exists(EXCEL_FILE):
                 wb = openpyxl.load_workbook(EXCEL_FILE)
-                # (Pengisian cell sesuai kebutuhan Excel Anda)
                 wb.save(EXCEL_FILE)
                 wb.close()
                 
                 with open(EXCEL_FILE, "rb") as f:
                     st.session_state['excel_bytes'] = f.read()
             else:
-                st.warning(f"File master Excel '{EXCEL_FILE}' tidak ditemukan. Menyiapkan PDF saja.")
+                st.warning(f"File master Excel '{EXCEL_FILE}' tidak ditemukan di folder. Menyiapkan PDF saja.")
         except Exception as e:
             st.error(f"Error memproses Excel: {e}")
             
@@ -422,7 +476,7 @@ if st.session_state.get('is_processed', False):
         if 'pdf_bytes' in st.session_state:
             filename_pdf = f"RINGKASAN_CATIN_F4_{nama_lk_file}_dan_{nama_pr_file}.pdf"
             st.download_button(
-                label="📄 UNDUH PDF F4 (1 LEMBAR)",
+                label="📄 UNDUH PDF F4 (1 LEMBAR UTUH)",
                 data=st.session_state['pdf_bytes'],
                 file_name=filename_pdf,
                 mime="application/pdf",
