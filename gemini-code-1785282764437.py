@@ -70,7 +70,24 @@ def update_excel_data(data, master_path):
     wb = openpyxl.load_workbook(master_path)
     ws = wb.active
 
-    # Pemetaan Field ke Sel Excel
+    # =============================================================
+    # FUNGSI PENANGANAN MERGED CELL (Mencegah Error Read-Only)
+    # =============================================================
+    def set_cell_value(cell_address, value):
+        try:
+            # Coba tulis nilai secara langsung ke sel
+            ws[cell_address] = value
+        except AttributeError:
+            # Jika sel berupa MergedCell read-only, cari sel utama (Top-Left)
+            for rng in ws.merged_cells.ranges:
+                if cell_address in rng:
+                    top_left_cell = rng.start_cell.coordinate
+                    ws[top_left_cell] = value
+                    break
+
+    # =============================================================
+    # PEMETAAN FIELD FORM KE SEL EXCEL
+    # =============================================================
     mapping = {
         # CATIN PRIA
         'catin_pria_nama': 'C13',
@@ -153,13 +170,15 @@ def update_excel_data(data, master_path):
         'status_wanita': 'C72',
     }
 
+    # Mengisi seluruh data menggunakan fungsi aman set_cell_value
     for key, cell in mapping.items():
-        ws[cell] = data.get(key, "")
+        set_cell_value(cell, data.get(key, ""))
 
     # Hitung Umur Otomatis
-    ws['C21'] = hitung_umur(data.get('catin_pria_ttl', ''))
-    ws['F21'] = hitung_umur(data.get('catin_wanita_ttl', ''))
+    set_cell_value('C21', hitung_umur(data.get('catin_pria_ttl', '')))
+    set_cell_value('F21', hitung_umur(data.get('catin_wanita_ttl', '')))
 
+    # Simpan Hasil
     output_path = "BERKAS_CATIN_TERISI.xlsx"
     wb.save(output_path)
     return output_path
