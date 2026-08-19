@@ -17,23 +17,38 @@ if not os.path.exists(FILE_NAME):
     st.error(f"File '{FILE_NAME}' tidak ditemukan di folder aplikasi! Pastikan file berada di folder yang sama dengan app.py.")
     st.stop()
 
-# Fungsi Konversi Otomatis Angka Serial Excel -> Format Tanggal Teks (DD/MM/YYYY)
-def convert_excel_date(val):
+# Daftar Nama Bulan Bahasa Indonesia
+NAMA_BULAN = [
+    "", "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI",
+    "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
+]
+
+# Fungsi Pintar untuk Mempertahankan / Mengonversi Format Tanggal Teks Bulan Indonesia
+def format_tanggal_indonesia(val):
+    if pd.isna(val) or val is None:
+        return ""
+    
+    # Jika angka serial Excel (misal 46273)
     if isinstance(val, (int, float)):
         try:
             date_obj = datetime(1899, 12, 30) + timedelta(days=int(val))
-            return date_obj.strftime("%d/%m/%Y")
+            return f"{date_obj.day} {NAMA_BULAN[date_obj.month]} {date_obj.year}"
         except:
             return str(val)
-    elif isinstance(val, str) and val.strip().isdigit():
+            
+    val_str = str(val).strip()
+    
+    # Jika angka murni berupa string (misal "46273")
+    if val_str.isdigit() and len(val_str) >= 5:
         try:
-            date_obj = datetime(1899, 12, 30) + timedelta(days=int(val.strip()))
-            return date_obj.strftime("%d/%m/%Y")
+            date_obj = datetime(1899, 12, 30) + timedelta(days=int(val_str))
+            return f"{date_obj.day} {NAMA_BULAN[date_obj.month]} {date_obj.year}"
         except:
-            return val
-    return str(val) if pd.notna(val) else ""
+            return val_str
+            
+    return val_str
 
-# Fungsi Membaca Data dari Sheet ISIAN DATA (Kolom B = Label, Kolom G/F = Isian Data)
+# Fungsi Membaca Data dari Sheet ISIAN DATA
 @st.cache_data(ttl=1)
 def load_excel_data():
     try:
@@ -122,7 +137,7 @@ def load_excel_data():
             val = ""
             if r_idx < len(df):
                 raw_val = df.iloc[r_idx, 6] if pd.notna(df.iloc[r_idx, 6]) else df.iloc[r_idx, 5]
-                val = convert_excel_date(raw_val)
+                val = format_tanggal_indonesia(raw_val)
                 if val.strip() == ":":
                     val = ""
             extracted_data.append((ref, label, val))
