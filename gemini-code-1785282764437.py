@@ -14,10 +14,6 @@ st.title("📝 Formulir Isian Data Catin (F4)")
 
 FILE_NAME = "BERKAS_CATIN_F4.xlsb"
 
-if not os.path.exists(FILE_NAME):
-    st.error(f"File '{FILE_NAME}' tidak ditemukan di folder aplikasi! Pastikan file berada di folder yang sama dengan app.py.")
-    st.stop()
-
 # Daftar Nama Bulan Bahasa Indonesia
 NAMA_BULAN = [
     "", "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI",
@@ -53,7 +49,6 @@ def hitung_umur_otomatis(ttl_val):
                 return f"{umur_kalkulasi} TAHUN"
     return ""
 
-# MAPPING ROW (Hanya untuk membaca data awal dari sheet ISIAN DATA)
 MAPPING_ROWS = [
     ("SURAT", "Baris 2", "Nomor Register", 1),
     ("SURAT", "Baris 3", "Tanggal Surat", 2),
@@ -125,11 +120,15 @@ MAPPING_ROWS = [
     ("WALI_SAKSI", "Baris 80", "Alamat Saksi 2", 79)
 ]
 
-@st.cache_data(ttl=1)
+# CACHE RINGAN: Hanya membaca file 1 kali saja agar tidak memicu loading lama / blank
+@st.cache_data(show_spinner="Memuat data awal dari Excel...")
 def load_excel_data():
+    if not os.path.exists(FILE_NAME):
+        return []
     try:
         excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
-        sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
+        sheet_target = "ISIAN DATA"
+        sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == sheet_target), excel_file.sheet_names[0])
         df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
         
         extracted_data = []
@@ -158,12 +157,11 @@ def load_excel_data():
 
         return extracted_data
     except Exception as e:
-        st.error(f"Gagal membaca file Excel: {e}")
         return []
 
 data_list = load_excel_data()
 
-# FORM INPUT INTERAKTIF STREAMLIT
+# FORM INPUT STREAMLIT
 with st.form("form_catin"):
     st.subheader("Isi / Sesuaikan Data Catin Secara Praktis")
     
@@ -208,13 +206,13 @@ with st.form("form_catin"):
         for group, ref, label, val in [item for item in data_list if item[0] == "WALI_SAKSI"]:
             user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
 
-    btn_simpan = st.form_submit_button("💾 Simpan Data & Preview", use_container_width=True)
+    btn_simpan = st.form_submit_button("💾 Simpan Data & Siapkan PDF", use_container_width=True)
 
 if btn_simpan:
     st.session_state['input_data'] = user_inputs
-    st.success("✅ Data berhasil disimpan di memori aplikasi! Silakan unduh PDF di bawah.")
+    st.success("✅ Data tersimpan cepat di memori! Tombol unduh PDF tersedia di bawah.")
 
-# DATA SAAT INI
+# PENYIAPAN NAMA FILE PDF
 data_saat_ini = st.session_state.get('input_data', {item[2]: item[3] for item in data_list})
 
 def bersihkan_nama_file(teks):
@@ -236,11 +234,8 @@ else:
 
 pdf_download_name = f"{base_name}.pdf"
 
-# PANEL DOWNLOAD PDF
-st.markdown("---")
-st.subheader("📥 Download Cetak PDF (F4)")
-
-def generate_pdf_portrait_f4(data_dict):
+# GENERATOR PDF F4 (Ditransfers ke memori saat diminta)
+def generate_pdf_f4(data_dict):
     buffer = BytesIO()
     F4_PORTRAIT = portrait((612, 936))
     
@@ -253,18 +248,15 @@ def generate_pdf_portrait_f4(data_dict):
         bottomMargin=15
     )
     elements = []
-    styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle('T', fontSize=12, leading=14, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor("#0F2C59"))
     sub_title = ParagraphStyle('ST', fontSize=8.5, leading=10, alignment=1, fontName='Helvetica-Oblique', textColor=colors.HexColor("#333333"))
-    
     head_sec = ParagraphStyle('HS', fontSize=8, leading=9, fontName='Helvetica-Bold', textColor=colors.whitesmoke)
     lbl_style = ParagraphStyle('L', fontSize=7.5, leading=8.5, fontName='Helvetica-Bold')
     val_style = ParagraphStyle('V', fontSize=7.5, leading=8.5, fontName='Helvetica')
     center_style = ParagraphStyle('CS', fontSize=7.5, leading=9.5, alignment=1, fontName='Helvetica')
     center_bold = ParagraphStyle('CB', fontSize=8, leading=10, alignment=1, fontName='Helvetica-Bold')
 
-    # Header Dokumen
     elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG", title_style))
     elements.append(Paragraph("BERKAS VERIFIKASI ISIAN DATA CATIN (FORM F4) - DESA TAMBI", sub_title))
     elements.append(Spacer(1, 6))
@@ -278,7 +270,6 @@ def generate_pdf_portrait_f4(data_dict):
     str_u_l = f" / {u_l}" if u_l else ""
     str_u_p = f" / {u_p}" if u_p else ""
 
-    # 1. TABLE REGIST & AKAD
     data_akad = [
         [Paragraph("<b>No. Register:</b> " + get_v("Nomor Register"), val_style), Paragraph("<b>Tgl Surat:</b> " + get_v("Tanggal Surat"), val_style)],
         [Paragraph("<b>Tgl Pelaksanaan:</b> " + get_v("Tanggal Pelaksanaan"), val_style), Paragraph("<b>Jam / Tempat Akad:</b> " + get_v("Jam Pelaksanaan") + " / " + get_v("Tempat Akad Nikah"), val_style)]
@@ -309,7 +300,6 @@ def generate_pdf_portrait_f4(data_dict):
         ]))
         return t
 
-    # 2. CATIN LAKI-LAKI
     t_pria = make_section("I. DATA CATIN LAKI-LAKI", [
         ("Nama Lengkap / Bin", get_v("Nama Catin Laki-Laki") + " Bin " + get_v("Bin (Ayah Laki-Laki)")),
         ("NIK / TTL / Umur", get_v("NIK Catin Laki-Laki") + " / " + get_v("TTL Catin Laki-Laki") + str_u_l),
@@ -321,7 +311,6 @@ def generate_pdf_portrait_f4(data_dict):
     elements.append(t_pria)
     elements.append(Spacer(1, 5))
 
-    # 3. CATIN PEREMPUAN
     t_wanita = make_section("II. DATA CATIN PEREMPUAN", [
         ("Nama Lengkap / Binti", get_v("Nama Catin Perempuan") + " Binti " + get_v("Binti (Ayah Perempuan)")),
         ("NIK / TTL / Umur", get_v("NIK Catin Perempuan") + " / " + get_v("TTL Catin Perempuan") + str_u_p),
@@ -333,7 +322,6 @@ def generate_pdf_portrait_f4(data_dict):
     elements.append(t_wanita)
     elements.append(Spacer(1, 5))
 
-    # 4. DATA WALI & SAKSI
     t_wali = make_section("III. DATA WALI NIKAH, MAHAR & SAKSI-SAKSI", [
         ("Nama Wali / Bin", get_v("Nama Wali") + " Bin " + get_v("Bin Wali") + f" ({get_v('Hubungan Wali')})"),
         ("NIK / TTL Wali", get_v("NIK Wali") + " / " + get_v("TTL Wali")),
@@ -345,7 +333,6 @@ def generate_pdf_portrait_f4(data_dict):
     elements.append(t_wali)
     elements.append(Spacer(1, 12))
 
-    # 5. KOLOM TANDA TANGAN
     ttd_data = [
         [
             Paragraph("Mengetahui,<br/><b>KEPALA DESA TAMBI</b>", center_style),
@@ -370,9 +357,13 @@ def generate_pdf_portrait_f4(data_dict):
     buffer.seek(0)
     return buffer
 
-pdf_bytes = generate_pdf_portrait_f4(st.session_state.get('input_data'))
+st.markdown("---")
+st.subheader("📥 Download Cetak PDF (F4)")
+
+# Cetak PDF dibuat secara dinamis tanpa mengganggu performa server
+pdf_bytes = generate_pdf_f4(st.session_state.get('input_data'))
 st.download_button(
-    label=f"📄 Download PDF F4 Siap Cetak: {pdf_download_name}",
+    label=f"📄 Unduh PDF F4: {pdf_download_name}",
     data=pdf_bytes,
     file_name=pdf_download_name,
     mime="application/pdf",
