@@ -60,7 +60,6 @@ def hitung_umur_otomatis(ttl_val, raw_excel_val=""):
         digits = re.sub(r'[^0-9]', '', str(raw_excel_val))
         if digits.isdigit():
             u_num = int(digits)
-            # Koreksi jika angka simpanan lama (cached) di xlsb masih 27 tapi lahir 1989
             if u_num >= 10:
                 return f"{u_num} TAHUN"
 
@@ -154,7 +153,6 @@ def load_excel_data():
         ttl_l, ttl_p = "", ""
         raw_u_l, raw_u_p = "", ""
 
-        # Membaca kolom samping umur jika ada di Excel
         try:
             for col_idx in range(6, df.shape[1]):
                 val_l = df.iloc[9, col_idx] if pd.notna(df.iloc[9, col_idx]) else ""
@@ -181,7 +179,6 @@ def load_excel_data():
                 
             extracted_data.append((group, ref, label, val))
             
-        # Sisipkan Umur Otomatis Hasil Kalkulasi Rumus Presisi
         umur_l_final = hitung_umur_otomatis(ttl_l, raw_u_l)
         umur_p_final = hitung_umur_otomatis(ttl_p, raw_u_p)
 
@@ -246,6 +243,33 @@ if btn_simpan:
     st.session_state['input_data'] = user_inputs
     st.success("✅ Data berhasil diperbarui!")
 
+# MENGAMBIL ISI DATA TERKINI
+data_saat_ini = st.session_state.get('input_data', {item[2]: item[3] for item in data_list})
+
+def bersihkan_nama_file(teks):
+    teks = str(teks).strip().upper()
+    teks = re.sub(r'[^A-Z0-9\s]', '', teks)
+    return "_".join(teks.split())
+
+nama_catin_l = data_saat_ini.get("Nama Catin Laki-Laki", "").strip()
+nama_catin_p = data_saat_ini.get("Nama Catin Perempuan", "").strip()
+
+# PEMBENTUKAN NAMA FILE EXCEL OTOMATIS BERDASARKAN NAMA CATIN
+if nama_catin_l and nama_catin_p:
+    excel_download_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_l)}_&_{bersihkan_nama_file(nama_catin_p)}.xlsb"
+elif nama_catin_l:
+    excel_download_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_l)}.xlsb"
+elif nama_catin_p:
+    excel_download_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_p)}.xlsb"
+else:
+    excel_download_name = "BERKAS_CATIN_F4_TERUPDATE.xlsb"
+
+# PEMBENTUKAN NAMA FILE PDF OTOMATIS BERDASARKAN NAMA CATIN
+if nama_catin_l and nama_catin_p:
+    pdf_download_name = f"Isian_Data_Catin_{bersihkan_nama_file(nama_catin_l)}_&_{bersihkan_nama_file(nama_catin_p)}.pdf"
+else:
+    pdf_download_name = "Isian_Data_Catin_Desa_Tambi_F4.pdf"
+
 # PANEL DOWNLOAD RESULT
 st.markdown("---")
 st.subheader("📥 Download Hasil")
@@ -256,9 +280,9 @@ with col_d1:
     with open(FILE_NAME, "rb") as f:
         file_bytes = f.read()
     st.download_button(
-        label="📥 Download File Excel Utama (.xlsb)",
+        label=f"📥 Download Excel: {excel_download_name}",
         data=file_bytes,
-        file_name=FILE_NAME,
+        file_name=excel_download_name,
         mime="application/vnd.ms-excel.sheet.binary.macroenabled.12",
         use_container_width=True
     )
@@ -297,7 +321,6 @@ with col_d2:
         def get_v(lbl):
             return str(current_data.get(lbl, "")).strip()
 
-        # Format Umur Dinamis & Presisi
         u_l = get_v("Umur Catin Laki-Laki") or hitung_umur_otomatis(get_v("TTL Catin Laki-Laki"))
         u_p = get_v("Umur Catin Perempuan") or hitung_umur_otomatis(get_v("TTL Catin Perempuan"))
         str_u_l = f" / {u_l}" if u_l else ""
@@ -370,7 +393,7 @@ with col_d2:
         elements.append(t_wali)
         elements.append(Spacer(1, 12))
 
-        # 5. KOLOM TANDA TANGAN (KASI PELAYANAN DI KANAN, KADES DI KIRI)
+        # 5. KOLOM TANDA TANGAN
         ttd_data = [
             [
                 Paragraph("Mengetahui,<br/><b>KEPALA DESA TAMBI</b>", center_style),
@@ -397,9 +420,9 @@ with col_d2:
 
     pdf_bytes = generate_pdf_portrait_f4(st.session_state.get('input_data'))
     st.download_button(
-        label="📄 Download Laporan PDF Portrait (1 Lembar F4 Presisi)",
+        label=f"📄 Download PDF: {pdf_download_name}",
         data=pdf_bytes,
-        file_name="Isian_Data_Catin_Desa_Tambi_F4.pdf",
+        file_name=pdf_download_name,
         mime="application/pdf",
         use_container_width=True
     )
