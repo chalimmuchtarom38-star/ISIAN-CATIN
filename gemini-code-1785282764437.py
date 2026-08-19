@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import streamlit as st
+from datetime import datetime, timedelta
 from io import BytesIO
 from reportlab.lib.pagesizes import landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
@@ -16,7 +17,23 @@ if not os.path.exists(FILE_NAME):
     st.error(f"File '{FILE_NAME}' tidak ditemukan di folder aplikasi! Pastikan file berada di folder yang sama dengan app.py.")
     st.stop()
 
-# Fungsi Membaca Data Langsung dari Sheet ISIAN DATA (Mengambil Kolom B sebagai Label & Kolom G sebagai Isi)
+# Fungsi Konversi Otomatis Angka Serial Excel -> Format Tanggal Teks (DD/MM/YYYY)
+def convert_excel_date(val):
+    if isinstance(val, (int, float)):
+        try:
+            date_obj = datetime(1899, 12, 30) + timedelta(days=int(val))
+            return date_obj.strftime("%d/%m/%Y")
+        except:
+            return str(val)
+    elif isinstance(val, str) and val.strip().isdigit():
+        try:
+            date_obj = datetime(1899, 12, 30) + timedelta(days=int(val.strip()))
+            return date_obj.strftime("%d/%m/%Y")
+        except:
+            return val
+    return str(val) if pd.notna(val) else ""
+
+# Fungsi Membaca Data dari Sheet ISIAN DATA (Kolom B = Label, Kolom G/F = Isian Data)
 @st.cache_data(ttl=1)
 def load_excel_data():
     try:
@@ -24,12 +41,10 @@ def load_excel_data():
         sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
         df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
         
-        # Format Pemetaan Baris (Indeks Baris Excel - 1)
-        # Ambil Label di Kolom B (Index 1) & Nilai Isi di Kolom G (Index 6)
         mapping_rows = [
             ("Baris 2", "Nomor Register", 1),
             ("Baris 3", "Tanggal Surat", 2),
-            ("Baris 4", "Tanggal Pelaksanaan", 3), # Mengambil dari Kolom G4
+            ("Baris 4", "Tanggal Pelaksanaan", 3),
             ("Baris 5", "Jam Pelaksanaan", 4),
             ("Baris 6", "Tempat Akad Nikah", 5),
             
@@ -106,9 +121,10 @@ def load_excel_data():
         for ref, label, r_idx in mapping_rows:
             val = ""
             if r_idx < len(df):
-                # Ambil isi di Kolom G (index 6), jika kosong ambil Kolom F (index 5)
                 raw_val = df.iloc[r_idx, 6] if pd.notna(df.iloc[r_idx, 6]) else df.iloc[r_idx, 5]
-                val = str(raw_val) if pd.notna(raw_val) and str(raw_val).strip() != ":" else ""
+                val = convert_excel_date(raw_val)
+                if val.strip() == ":":
+                    val = ""
             extracted_data.append((ref, label, val))
             
         return extracted_data
@@ -118,7 +134,7 @@ def load_excel_data():
 
 data_list = load_excel_data()
 
-# FORM INPUT INTERAKTIF
+# FORM INPUT INTERAKTIF STREAMLIT
 with st.form("form_catin"):
     st.subheader("Isi / Sesuaikan Data Catin Secara Praktis")
     
@@ -175,7 +191,7 @@ if btn_simpan:
     st.session_state['input_data'] = user_inputs
     st.success("✅ Data berhasil diperbarui!")
 
-# PANEL DOWNLOAD
+# PANEL DOWNLOAD RESULT
 st.markdown("---")
 st.subheader("📥 Download Hasil")
 
