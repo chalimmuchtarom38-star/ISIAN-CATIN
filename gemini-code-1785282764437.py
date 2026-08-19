@@ -78,40 +78,60 @@ def format_tanggal_indonesia(val):
     return val_str
 
 def hitung_umur_dari_ttl(ttl_str):
-    """Mengekstrak tanggal dari teks TTL dan menghitung umur dalam tahun"""
+    """
+    Ekstraksi tanggal lahir yang sangat fleksibel dari berbagai format teks TTL
+    contoh:
+    - Pemalang, 12-05-1998
+    - Pemalang, 12 Mei 1998
+    - 12/05/1998
+    - 1998-05-12
+    """
     if not ttl_str or not str(ttl_str).strip():
         return ""
     
-    ttl_clean = str(ttl_str).strip()
+    txt = str(ttl_str).strip().upper()
     
-    # Cari pola tanggal YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, dll.
-    match = re.search(r'(\d{1,2})[-/\s.](\d{1,2}|[a-zA-A]+)[-/\s.](\d{2,4})', ttl_clean)
-    if not match:
-        match = re.search(r'(\d{4})[-/\s.](\d{1,2}|[a-zA-A]+)[-/\s.](\d{1,2})', ttl_clean)
-    
+    # 1. Coba pola angka murni: DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD
+    match_num = re.search(r'(\d{1,2})[-/\. ](\d{1,2})[-/\. ](\d{2,4})', txt)
     birth_date = None
-    if match:
-        parts = match.groups()
-        # Coba parse berbagai kemungkinan format tanggal
-        for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%d %m %Y", "%Y-%m-%d", "%Y/%m/%d"):
+    
+    if match_num:
+        d, m, y = match_num.groups()
+        y = int(y) if len(y) == 4 else (2000 + int(y) if int(y) < 30 else 1900 + int(y))
+        d, m = int(d), int(m)
+        if 1 <= m <= 12 and 1 <= d <= 31:
             try:
-                date_str = f"{parts[0]}-{parts[1]}-{parts[2]}"
-                birth_date = datetime.strptime(date_str, fmt).date()
-                break
-            except ValueError:
-                pass
-        
-        # Coba parse nama bulan (contoh: 12 Mei 1995)
-        if not birth_date:
-            try:
-                p1, p2, p3 = parts[0], parts[1].upper(), parts[2]
-                month_idx = next((i for i, b in enumerate(NAMA_BULAN) if b and b.startswith(p2[:3])), None)
-                if month_idx:
-                    yr = int(p3) if len(p3) == 4 else 1900 + int(p3)
-                    birth_date = date(yr, month_idx, int(p1))
+                birth_date = date(y, m, d)
             except:
                 pass
 
+    # 2. Jika belum berhasil, coba pola YYYY-MM-DD
+    if not birth_date:
+        match_iso = re.search(r'(\d{4})[-/\. ](\d{1,2})[-/\. ](\d{1,2})', txt)
+        if match_iso:
+            y, m, d = match_iso.groups()
+            try:
+                birth_date = date(int(y), int(m), int(d))
+            except:
+                pass
+
+    # 3. Jika belum berhasil, coba ekstrak berdasarkan nama bulan Bahasa Indonesia/Inggris
+    if not birth_date:
+        match_text = re.search(r'(\d{1,2})\s+([A-Z]+)\s+(\d{4})', txt)
+        if match_text:
+            d_str, m_str, y_str = match_text.groups()
+            month_idx = None
+            for idx, b in enumerate(NAMA_BULAN):
+                if b and m_str.startswith(b[:3]):
+                    month_idx = idx
+                    break
+            if month_idx:
+                try:
+                    birth_date = date(int(y_str), month_idx, int(d_str))
+                except:
+                    pass
+
+    # 4. Hitung selisih tahun jika tanggal lahir berhasil diekstrak
     if birth_date:
         today = date.today()
         age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
@@ -437,11 +457,11 @@ with col_d2:
             for k in keys:
                 val_txt = str(current_data.get(k, "") or "")
                 
-                # Tambahkan kalkulasi umur secara otomatis khusus untuk field TTL di PDF
+                # Tambahkan kalkulasi umur secara eksplisit pada seluruh parameter TTL
                 if "TTL" in k and val_txt:
                     str_umur = hitung_umur_dari_ttl(val_txt)
-                    if str_umur and str_umur not in val_txt:
-                        val_txt += f"<b>{str_umur}</b>"
+                    if str_umur and "Tahun" not in val_txt:
+                        val_txt += f" <b>{str_umur}</b>"
                         
                 table_rows.append([
                     Paragraph(f"<b>{k}</b>", cell_bold),
