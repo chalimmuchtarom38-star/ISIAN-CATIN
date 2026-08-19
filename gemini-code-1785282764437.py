@@ -275,17 +275,20 @@ def generate_updated_xlsx(data_dict):
     output.seek(0)
     return output
 
+# Ambil data terkini untuk membuat nama file Excel & PDF
+curr_data = st.session_state.get('input_data', {
+    item[1]: format_tanggal_indonesia(item[2]) if item[1] in ["Tanggal Surat", "Tanggal Pelaksanaan"] else item[2] 
+    for item in data_list
+})
+pria = str(curr_data.get("Nama Catin Laki-Laki", "")).strip().upper()
+wanita = str(curr_data.get("Nama Catin Perempuan", "")).strip().upper()
+
+file_excel_name = f"BERKAS_CATIN_{pria}_&_{wanita}.xlsx" if (pria or wanita) else "BERKAS_CATIN_TERISI.xlsx"
+file_pdf_name = f"Ringkasan_Data_Catin_F4_{pria}_&_{wanita}.pdf" if (pria or wanita) else "Ringkasan_Data_Catin_F4.pdf"
+
 with col_d1:
     excel_bytes = generate_updated_xlsx(st.session_state.get('input_data'))
     
-    curr_data = st.session_state.get('input_data', {
-        item[1]: format_tanggal_indonesia(item[2]) if item[1] in ["Tanggal Surat", "Tanggal Pelaksanaan"] else item[2] 
-        for item in data_list
-    })
-    pria = str(curr_data.get("Nama Catin Laki-Laki", "")).strip().upper()
-    wanita = str(curr_data.get("Nama Catin Perempuan", "")).strip().upper()
-    file_excel_name = f"BERKAS_CATIN_{pria}_&_{wanita}.xlsx" if (pria or wanita) else "BERKAS_CATIN_TERISI.xlsx"
-
     st.download_button(
         label="📊 Download File Excel Terisi Utuh (.xlsx)",
         data=excel_bytes,
@@ -295,7 +298,6 @@ with col_d1:
     )
 
 with col_d2:
-    # FUNGSI PDF DIPERBARUI: FORMAT PORTRAIT F4 FULL 1 LEMBAR DENGAN BLOK TANDA TANGAN KASI & KEPALA DESA TAMBI
     def generate_pdf_formal(data_dict):
         buffer = BytesIO()
         F4_PORTRAIT = portrait((612, 936))
@@ -335,7 +337,6 @@ with col_d2:
         cell_bold = ParagraphStyle('CB', fontSize=6.5, leading=7.5, fontName='Helvetica-Bold')
         cell_norm = ParagraphStyle('CN', fontSize=6.5, leading=7.5, fontName='Helvetica')
         
-        # Style Tanda Tangan
         ttd_center = ParagraphStyle('TTDCenter', fontSize=7.5, leading=9, alignment=1, fontName='Helvetica')
         ttd_bold_underline = ParagraphStyle('TTDBold', fontSize=8, leading=10, alignment=1, fontName='Helvetica-Bold')
 
@@ -384,7 +385,6 @@ with col_d2:
             ]
         ]
 
-        # Menyusun tabel tunggal penuh ke bawah untuk mode Portrait
         for title, keys in groups:
             table_rows.append([
                 Paragraph(f"<b>{title}</b>", sec_header),
@@ -413,7 +413,6 @@ with col_d2:
             ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor("#D1D5DB")),
         ]
 
-        # Mewarnai header grup
         r_idx = 1
         for title, keys in groups:
             t_style.append(('BACKGROUND', (0, r_idx), (1, r_idx), colors.HexColor("#1E3A8A")))
@@ -423,7 +422,6 @@ with col_d2:
         elements.append(pdf_table)
         elements.append(Spacer(1, 10))
 
-        # BLOK TANDA TANGAN (Kasi Pelayanan & Kepala Desa Tambi)
         tgl_surat_str = current_data.get("Tanggal Surat", format_tanggal_indonesia(date.today()))
         
         ttd_rows = [
@@ -459,7 +457,7 @@ with col_d2:
     st.download_button(
         label="📄 Download Laporan PDF Ringkas Terkelompok (1 Lembar F4 Portrait)",
         data=pdf_bytes,
-        file_name="Ringkasan_Data_Catin_F4.pdf",
+        file_name=file_pdf_name,
         mime="application/pdf",
         use_container_width=True
     )
