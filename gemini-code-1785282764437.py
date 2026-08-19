@@ -2,7 +2,7 @@ import os
 import openpyxl
 import pandas as pd
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from io import BytesIO
 from reportlab.lib.pagesizes import landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
@@ -24,9 +24,45 @@ NAMA_BULAN = [
     "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
 ]
 
+def parse_to_date_object(val):
+    """Mencoba mengubah string/excel serial/date menjadi object date Python untuk st.date_input"""
+    if isinstance(val, date):
+        return val
+    if isinstance(val, datetime):
+        return val.date()
+    if pd.isna(val) or val is None or str(val).strip() == "":
+        return date.today()
+    if isinstance(val, (int, float)):
+        try:
+            dt = datetime(1899, 12, 30) + timedelta(days=int(val))
+            return dt.date()
+        except:
+            return date.today()
+    
+    val_str = str(val).strip()
+    # Cek jika format serial number excel dalam string
+    if val_str.isdigit() and len(val_str) >= 5:
+        try:
+            dt = datetime(1899, 12, 30) + timedelta(days=int(val_str))
+            return dt.date()
+        except:
+            pass
+            
+    # Parsing umum YYYY-MM-DD / DD-MM-YYYY
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(val_str, fmt).date()
+        except ValueError:
+            pass
+            
+    return date.today()
+
 def format_tanggal_indonesia(val):
-    if pd.isna(val) or val is None:
+    """Mengubah date object atau nilai tanggal menjadi string 'DD BULAN YYYY'"""
+    if pd.isna(val) or val is None or str(val).strip() == "":
         return ""
+    if isinstance(val, (date, datetime)):
+        return f"{val.day} {NAMA_BULAN[val.month]} {val.year}"
     if isinstance(val, (int, float)):
         try:
             date_obj = datetime(1899, 12, 30) + timedelta(days=int(val))
@@ -128,13 +164,15 @@ def load_excel_data():
         
         extracted_data = []
         for ref, label, r_idx in MAPPING_ROWS:
-            # Kolom G (Kolom ke-7) atau Kolom F (Kolom ke-6)
             val = ws.cell(row=r_idx, column=7).value
             if val is None:
                 val = ws.cell(row=r_idx, column=6).value
-            val = format_tanggal_indonesia(val)
-            if str(val).strip() == ":":
-                val = ""
+            
+            # Jika bukan field tanggal, format ke string tanggal Indonesia
+            if label not in ["Tanggal Surat", "Tanggal Pelaksanaan"]:
+                val = format_tanggal_indonesia(val)
+                if str(val).strip() == ":":
+                    val = ""
             extracted_data.append((ref, label, val, r_idx))
             
         return extracted_data
@@ -160,40 +198,51 @@ with st.form("form_catin"):
     with t1:
         st.markdown("##### Data Surat & Pelaksanaan Akad")
         for ref, label, val, row_num in data_list[:5]:
-            user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
+            if label in ["Tanggal Surat", "Tanggal Pelaksanaan"]:
+                # Menggunakan Date Picker (Kalender) untuk pemilihan tanggal yang presisi
+                default_dt = parse_to_date_object(val)
+                d_selected = st.date_input(
+                    f"[{ref}] {label}", 
+                    value=default_dt, 
+                    format="DD/MM/YYYY",
+                    key=f"inp_{row_num}"
+                )
+                user_inputs[label] = format_tanggal_indonesia(d_selected)
+            else:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=str(val or ""), key=f"inp_{row_num}")
 
     with t2:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("##### -- Data Catin Laki-Laki --")
             for ref, label, val, row_num in data_list[5:15]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=str(val or ""), key=f"inp_{row_num}")
         with col2:
             st.markdown("##### -- Data Orang Tua Laki-Laki --")
             for ref, label, val, row_num in data_list[15:25]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=str(val or ""), key=f"inp_{row_num}")
 
     with t3:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("##### -- Data Catin Perempuan --")
             for ref, label, val, row_num in data_list[25:35]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=str(val or ""), key=f"inp_{row_num}")
         with col2:
             st.markdown("##### -- Data Orang Tua Perempuan --")
             for ref, label, val, row_num in data_list[35:45]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=str(val or ""), key=f"inp_{row_num}")
 
     with t4:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("##### -- Data Wali & Mahar --")
             for ref, label, val, row_num in data_list[45:53]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=str(val or ""), key=f"inp_{row_num}")
         with col2:
             st.markdown("##### -- Data Saksi 1 & Saksi 2 --")
             for ref, label, val, row_num in data_list[53:]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=str(val or ""), key=f"inp_{row_num}")
 
     btn_simpan = st.form_submit_button("💾 Simpan & Perbarui Data Input", use_container_width=True)
 
@@ -207,25 +256,23 @@ st.subheader("📥 Download Hasil Isian")
 
 col_d1, col_d2 = st.columns(2)
 
-# FUNGSI MENGEDIT FILE EXCEL MASTER .XLSX SECARA UTUH
+# FUNGSI MENGEDIT FILE EXCEL MASTER .XLSX SECARA UTUH (TIDAK DIUTAK-ATIK)
 def generate_updated_xlsx(data_dict):
-    """
-    Membuka file Excel master .xlsx asli, menulis data baru ke sel Kolom G sheet ISIAN DATA,
-    sehingga seluruh sheet lain dan rumus tetap utuh saat di-download.
-    """
     output = BytesIO()
     wb = openpyxl.load_workbook(FILE_NAME)
     
     sheet_name = next((s for s in wb.sheetnames if s.strip().upper() == "ISIAN DATA"), wb.sheetnames[0])
     ws = wb[sheet_name]
     
-    current_inputs = data_dict if data_dict else {item[1]: item[2] for item in data_list}
+    current_inputs = data_dict if data_dict else {
+        item[1]: format_tanggal_indonesia(item[2]) if item[1] in ["Tanggal Surat", "Tanggal Pelaksanaan"] else item[2] 
+        for item in data_list
+    }
     label_to_row = {item[1]: item[2] for item in MAPPING_ROWS}
     
     for label, val in current_inputs.items():
         if label in label_to_row:
             r_idx = label_to_row[label]
-            # Tulis data baru ke Kolom G (Column 7)
             ws.cell(row=r_idx, column=7, value=val)
 
     wb.save(output)
@@ -235,9 +282,12 @@ def generate_updated_xlsx(data_dict):
 with col_d1:
     excel_bytes = generate_updated_xlsx(st.session_state.get('input_data'))
     
-    curr_data = st.session_state.get('input_data', {item[1]: item[2] for item in data_list})
-    pria = curr_data.get("Nama Catin Laki-Laki", "").strip().upper()
-    wanita = curr_data.get("Nama Catin Perempuan", "").strip().upper()
+    curr_data = st.session_state.get('input_data', {
+        item[1]: format_tanggal_indonesia(item[2]) if item[1] in ["Tanggal Surat", "Tanggal Pelaksanaan"] else item[2] 
+        for item in data_list
+    })
+    pria = str(curr_data.get("Nama Catin Laki-Laki", "")).strip().upper()
+    wanita = str(curr_data.get("Nama Catin Perempuan", "")).strip().upper()
     file_excel_name = f"BERKAS_CATIN_{pria}_&_{wanita}.xlsx" if (pria or wanita) else "BERKAS_CATIN_TERISI.xlsx"
 
     st.download_button(
@@ -284,52 +334,128 @@ with col_d2:
             textColor=colors.HexColor("#333333")
         )
         
+        sec_header = ParagraphStyle('SecHeader', fontSize=7, leading=8, fontName='Helvetica-Bold', textColor=colors.whitesmoke)
         cell_bold = ParagraphStyle('CB', fontSize=6.5, leading=7.5, fontName='Helvetica-Bold')
         cell_norm = ParagraphStyle('CN', fontSize=6.5, leading=7.5, fontName='Helvetica')
         
         elements.append(Paragraph("RINGKASAN ISIAN DATA BERKAS CATIN (F4)", header_style))
-        elements.append(Paragraph("Daftar Pemeriksaan & Verifikasi Data Pernikahan", sub_header_style))
+        elements.append(Paragraph("Daftar Pemeriksaan & Verifikasi Data Pernikahan Terkelompok", sub_header_style))
         elements.append(Spacer(1, 6))
         
-        current_data = data_dict if data_dict else {item[1]: item[2] for item in data_list}
-        items = list(current_data.items())
+        current_data = data_dict if data_dict else {
+            item[1]: format_tanggal_indonesia(item[2]) if item[1] in ["Tanggal Surat", "Tanggal Pelaksanaan"] else item[2] 
+            for item in data_list
+        }
         
+        groups = [
+            ("I. REGISTER & PELAKSANAAN AKAD", [
+                "Nomor Register", "Tanggal Surat", "Tanggal Pelaksanaan", "Jam Pelaksanaan", "Tempat Akad Nikah"
+            ]),
+            ("II. DATA CATIN LAKI-LAKI", [
+                "Nama Catin Laki-Laki", "Bin (Ayah Laki-Laki)", "TTL Catin Laki-Laki", "NIK Catin Laki-Laki", 
+                "Pekerjaan Laki-Laki", "Status Laki-Laki", "Jenis Kelamin Laki-Laki", "Nama Istri Terdahulu", 
+                "Alamat Catin Laki-Laki", "Pendidikan Laki-Laki"
+            ]),
+            ("III. DATA ORANG TUA LAKI-LAKI", [
+                "Nama Ayah Laki-Laki", "NIK Ayah Laki-Laki", "TTL Ayah Laki-Laki", "Pekerjaan Ayah Laki-Laki", "Alamat Ayah Laki-Laki",
+                "Nama Ibu Laki-Laki", "NIK Ibu Laki-Laki", "TTL Ibu Laki-Laki", "Pekerjaan Ibu Laki-Laki", "Alamat Ibu Laki-Laki"
+            ]),
+            ("IV. DATA CATIN PEREMPUAN", [
+                "Nama Catin Perempuan", "Binti (Ayah Perempuan)", "TTL Catin Perempuan", "NIK Catin Perempuan", 
+                "Pekerjaan Perempuan", "Status Perempuan", "Jenis Kelamin Perempuan", "Alamat Catin Perempuan", 
+                "Nama Suami Terdahulu", "Pendidikan Perempuan"
+            ]),
+            ("V. DATA ORANG TUA PEREMPUAN", [
+                "Nama Ayah Perempuan", "NIK Ayah Perempuan", "TTL Ayah Perempuan", "Pekerjaan Ayah Perempuan", "Alamat Ayah Perempuan",
+                "Nama Ibu Perempuan", "NIK Ibu Perempuan", "TTL Ibu Perempuan", "Pekerjaan Ibu Perempuan", "Alamat Ibu Perempuan"
+            ]),
+            ("VI. DATA WALI, MAHAR & SAKSI", [
+                "Nama Wali", "Bin Wali", "NIK Wali", "TTL Wali", "Pekerjaan Wali", "Alamat Wali", "Hubungan Wali", "Mahar / Maskawin",
+                "Nama Saksi 1", "TTL Saksi 1", "NIK Saksi 1", "Pekerjaan Saksi 1", "Alamat Saksi 1",
+                "Nama Saksi 2", "TTL Saksi 2", "NIK Saksi 2", "Pekerjaan Saksi 2", "Alamat Saksi 2"
+            ])
+        ]
+
         table_rows = [
             [
-                Paragraph("<b>FIELD / PARAMETER (A)</b>", cell_bold),
-                Paragraph("<b>ISIAN DATA (A)</b>", cell_bold),
-                Paragraph("<b>FIELD / PARAMETER (B)</b>", cell_bold),
-                Paragraph("<b>ISIAN DATA (B)</b>", cell_bold)
+                Paragraph("<b>FIELD / PARAMETER (SISI A)</b>", cell_bold),
+                Paragraph("<b>ISIAN DATA</b>", cell_bold),
+                Paragraph("<b>FIELD / PARAMETER (SISI B)</b>", cell_bold),
+                Paragraph("<b>ISIAN DATA</b>", cell_bold)
             ]
         ]
-        
-        half = (len(items) + 1) // 2
-        for i in range(half):
-            k1, v1 = items[i]
-            k2, v2 = items[i + half] if (i + half) < len(items) else ("", "")
-            
-            table_rows.append([
-                Paragraph(f"<b>{k1}</b>", cell_bold),
-                Paragraph(str(v1), cell_norm),
-                Paragraph(f"<b>{k2}</b>" if k2 else "", cell_bold),
-                Paragraph(str(v2) if v2 else "", cell_norm)
-            ])
-            
-        col_widths = [160, 293, 160, 293]
+
+        left_groups = groups[:3]
+        right_groups = groups[3:]
+
+        def flatten_group(grp_list):
+            flat = []
+            for title, keys in grp_list:
+                flat.append(('HEADER', title))
+                for k in keys:
+                    flat.append(('DATA', k, current_data.get(k, "")))
+            return flat
+
+        left_flat = flatten_group(left_groups)
+        right_flat = flatten_group(right_groups)
+
+        max_rows = max(len(left_flat), len(right_flat))
+
+        for i in range(max_rows):
+            item_l = left_flat[i] if i < len(left_flat) else None
+            item_r = right_flat[i] if i < len(right_flat) else None
+
+            if item_l:
+                if item_l[0] == 'HEADER':
+                    c1 = Paragraph(f"<b>{item_l[1]}</b>", sec_header)
+                    c2 = Paragraph("", cell_norm)
+                else:
+                    c1 = Paragraph(f"<b>{item_l[1]}</b>", cell_bold)
+                    c2 = Paragraph(str(item_l[2] or ""), cell_norm)
+            else:
+                c1, c2 = Paragraph("", cell_norm), Paragraph("", cell_norm)
+
+            if item_r:
+                if item_r[0] == 'HEADER':
+                    c3 = Paragraph(f"<b>{item_r[1]}</b>", sec_header)
+                    c4 = Paragraph("", cell_norm)
+                else:
+                    c3 = Paragraph(f"<b>{item_r[1]}</b>", cell_bold)
+                    c4 = Paragraph(str(item_r[2] or ""), cell_norm)
+            else:
+                c3, c4 = Paragraph("", cell_norm), Paragraph("", cell_norm)
+
+            table_rows.append([c1, c2, c3, c4])
+
+        col_widths = [150, 303, 150, 303]
         
         pdf_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
-        pdf_table.setStyle(TableStyle([
+        
+        t_style = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#0F2C59")),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 1.8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1.8),
+            ('TOPPADDING', (0, 0), (-1, -1), 1.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
             ('LEFTPADDING', (0, 0), (-1, -1), 4),
             ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor("#CCCCCC")),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F9F9F9")]),
-        ]))
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor("#D1D5DB")),
+        ]
+
+        r_idx = 1
+        for i in range(max_rows):
+            item_l = left_flat[i] if i < len(left_flat) else None
+            item_r = right_flat[i] if i < len(right_flat) else None
+
+            if item_l and item_l[0] == 'HEADER':
+                t_style.append(('BACKGROUND', (0, r_idx), (1, r_idx), colors.HexColor("#1E3A8A")))
+            if item_r and item_r[0] == 'HEADER':
+                t_style.append(('BACKGROUND', (2, r_idx), (3, r_idx), colors.HexColor("#1E3A8A")))
+
+            r_idx += 1
+
+        pdf_table.setStyle(TableStyle(t_style))
         
         elements.append(pdf_table)
         doc.build(elements)
@@ -338,9 +464,9 @@ with col_d2:
 
     pdf_bytes = generate_pdf_formal(st.session_state.get('input_data'))
     st.download_button(
-        label="📄 Download Laporan PDF Formal (1 Lembar F4)",
+        label="📄 Download Laporan PDF Ringkas Terkelompok (1 Lembar F4)",
         data=pdf_bytes,
-        file_name="Isian_Data_Catin_F4_Formal.pdf",
+        file_name="Ringkasan_Data_Catin_F4.pdf",
         mime="application/pdf",
         use_container_width=True
     )
