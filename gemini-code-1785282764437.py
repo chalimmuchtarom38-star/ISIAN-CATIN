@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 from io import BytesIO
-from reportlab.lib.pagesizes import landscape
+from reportlab.lib.pagesizes import portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -67,6 +67,7 @@ def load_excel_data():
             ("CATIN_L", "Baris 15", "Nama Istri Terdahulu", 14),
             ("CATIN_L", "Baris 16", "Alamat Catin Laki-Laki", 15),
             ("CATIN_L", "Baris 17", "Pendidikan Laki-Laki", 16),
+            ("CATIN_L", "Baris 18", "Umur Catin Laki-Laki", 17),
             
             # Group: ORTU PRIA
             ("ORTU_L", "Baris 19", "Nama Ayah Laki-Laki", 18),
@@ -91,6 +92,7 @@ def load_excel_data():
             ("CATIN_P", "Baris 41", "Alamat Catin Perempuan", 40),
             ("CATIN_P", "Baris 42", "Nama Suami Terdahulu", 41),
             ("CATIN_P", "Baris 43", "Pendidikan Perempuan", 42),
+            ("CATIN_P", "Baris 44", "Umur Catin Perempuan", 43),
             
             # Group: ORTU WANITA
             ("ORTU_P", "Baris 45", "Nama Ayah Perempuan", 44),
@@ -211,171 +213,143 @@ with col_d1:
     )
 
 with col_d2:
-    # FUNGSI PEMBUATAN PDF KELOMPOK TERSTRUKTUR (1 LEMBAR F4 LANDSCAPE)
-    def generate_pdf_grouped(data_dict):
+    # FUNGSI PEMBUATAN PDF PORTRAIT F4 (BESAR, FULL 1 LEMBAR, TTD LENGKAP)
+    def generate_pdf_portrait_f4(data_dict):
         buffer = BytesIO()
-        F4_LANDSCAPE = landscape((612, 936)) # Ukuran F4 Landscape
+        # Ukuran F4 Portrait (612 x 936 point)
+        F4_PORTRAIT = portrait((612, 936))
         
         doc = SimpleDocTemplate(
             buffer, 
-            pagesize=F4_LANDSCAPE, 
-            rightMargin=15, 
-            leftMargin=15, 
-            topMargin=12, 
-            bottomMargin=12
+            pagesize=F4_PORTRAIT, 
+            rightMargin=25, 
+            leftMargin=25, 
+            topMargin=20, 
+            bottomMargin=20
         )
         elements = []
         styles = getSampleStyleSheet()
         
-        # Styles
-        title_style = ParagraphStyle('T', fontSize=10, leading=11, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor("#0F2C59"))
-        sub_title = ParagraphStyle('ST', fontSize=7.5, leading=8.5, alignment=1, fontName='Helvetica-Oblique', textColor=colors.HexColor("#444444"))
+        # Style Teks Lebih Besar & Jelas
+        title_style = ParagraphStyle('T', fontSize=13, leading=15, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor("#0F2C59"))
+        sub_title = ParagraphStyle('ST', fontSize=9, leading=11, alignment=1, fontName='Helvetica-Oblique', textColor=colors.HexColor("#333333"))
         
-        head_cat = ParagraphStyle('HC', fontSize=6.5, leading=7.5, fontName='Helvetica-Bold', textColor=colors.whitesmoke, alignment=1)
-        lbl_style = ParagraphStyle('L', fontSize=6, leading=7, fontName='Helvetica-Bold')
-        val_style = ParagraphStyle('V', fontSize=6, leading=7, fontName='Helvetica')
-        
-        # Header Dokumen
-        elements.append(Paragraph("RINGKASAN ISIAN DATA BERKAS CATIN (F4)", title_style))
-        elements.append(Paragraph("Dokumen Verifikasi & Data Isian Pernikahan", sub_title))
-        elements.append(Spacer(1, 4))
-        
-        # Gabungkan Data Terbaru
-        current_data = data_dict if data_dict else {item[2]: item[3] for item in data_list}
-        
-        def get_v(lbl):
-            return str(current_data.get(lbl, ""))
+        head_sec = ParagraphStyle('HS', fontSize=8.5, leading=10, fontName='Helvetica-Bold', textColor=colors.whitesmoke)
+        lbl_style = ParagraphStyle('L', fontSize=8, leading=9.5, fontName='Helvetica-Bold')
+        val_style = ParagraphStyle('V', fontSize=8, leading=9.5, fontName='Helvetica')
+        center_style = ParagraphStyle('CS', fontSize=8, leading=10, alignment=1, fontName='Helvetica')
+        center_bold = ParagraphStyle('CB', fontSize=8.5, leading=10.5, alignment=1, fontName='Helvetica-Bold')
 
-        # SUSUNAN BLOK KELOMPOK DALAM DUO KOLOM
-        # Kolom Kiri: Catin Laki-Laki & Ortu Laki-Laki
-        # Kolom Kanan: Catin Perempuan & Ortu Perempuan
+        # Header Dokumen
+        elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG", title_style))
+        elements.append(Paragraph("BERKAS VERIFIKASI ISIAN DATA CATIN (FORM F4) - DESA TAMBI", sub_title))
+        elements.append(Spacer(1, 8))
         
-        # 1. Trik Tabel untuk Header Akad & Register (Melintang Atas)
-        row_akad = [
-            Paragraph("<b>No. Register:</b> " + get_v("Nomor Register"), val_style),
-            Paragraph("<b>Tgl Surat:</b> " + get_v("Tanggal Surat"), val_style),
-            Paragraph("<b>Tgl Pelaksanaan:</b> " + get_v("Tanggal Pelaksanaan"), val_style),
-            Paragraph("<b>Jam:</b> " + get_v("Jam Pelaksanaan"), val_style),
-            Paragraph("<b>Tempat Akad:</b> " + get_v("Tempat Akad Nikah"), val_style)
+        current_data = data_dict if data_dict else {item[2]: item[3] for item in data_list}
+        def get_v(lbl):
+            return str(current_data.get(lbl, "")).strip()
+
+        # Format Umur
+        umur_l = get_v("Umur Catin Laki-Laki")
+        umur_p = get_v("Umur Catin Perempuan")
+        str_umur_l = f" ({umur_l} Thn)" if umur_l else ""
+        str_umur_p = f" ({umur_p} Thn)" if umur_p else ""
+
+        # 1. TABLE REGIST & AKAD
+        data_akad = [
+            [Paragraph("<b>No. Register:</b> " + get_v("Nomor Register"), val_style), Paragraph("<b>Tgl Surat:</b> " + get_v("Tanggal Surat"), val_style)],
+            [Paragraph("<b>Tgl Pelaksanaan:</b> " + get_v("Tanggal Pelaksanaan"), val_style), Paragraph("<b>Jam / Tempat:</b> " + get_v("Jam Pelaksanaan") + " / " + get_v("Tempat Akad Nikah"), val_style)]
         ]
-        t_akad = Table([row_akad], colWidths=[180, 180, 180, 120, 246])
+        t_akad = Table(data_akad, colWidths=[281, 281])
         t_akad.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#EAECEE")),
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#EAEDED")),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#BDC3C7")),
-            ('TOPPADDING', (0,0), (-1,-1), 3),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-            ('LEFTPADDING', (0,0), (-1,-1), 4),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 6),
         ]))
         elements.append(t_akad)
-        elements.append(Spacer(1, 4))
-        
-        # 2. Tabel Utama 2 Kolom Besar (Sisi Pria vs Sisi Wanita)
-        col_pria = [
-            [Paragraph("DATA CATIN LAKI-LAKI", head_cat), ""],
-            [Paragraph("Nama Lengkap", lbl_style), Paragraph(get_v("Nama Catin Laki-Laki") + " Bin " + get_v("Bin (Ayah Laki-Laki)"), val_style)],
-            [Paragraph("NIK / TTL", lbl_style), Paragraph(get_v("NIK Catin Laki-Laki") + " / " + get_v("TTL Catin Laki-Laki"), val_style)],
-            [Paragraph("Status / Pekerjaan", lbl_style), Paragraph(get_v("Status Laki-Laki") + " / " + get_v("Pekerjaan Laki-Laki"), val_style)],
-            [Paragraph("Alamat", lbl_style), Paragraph(get_v("Alamat Catin Laki-Laki"), val_style)],
-            [Paragraph("DATA ORANG TUA (AYAH & IBU) LAKI-LAKI", head_cat), ""],
-            [Paragraph("Ayah / NIK", lbl_style), Paragraph(get_v("Nama Ayah Laki-Laki") + " / " + get_v("NIK Ayah Laki-Laki"), val_style)],
-            [Paragraph("TTL / Pekerjaan", lbl_style), Paragraph(get_v("TTL Ayah Laki-Laki") + " / " + get_v("Pekerjaan Ayah Laki-Laki"), val_style)],
-            [Paragraph("Ibu / NIK", lbl_style), Paragraph(get_v("Nama Ibu Laki-Laki") + " / " + get_v("NIK Ibu Laki-Laki"), val_style)],
-            [Paragraph("TTL / Pekerjaan", lbl_style), Paragraph(get_v("TTL Ibu Laki-Laki") + " / " + get_v("Pekerjaan Ibu Laki-Laki"), val_style)],
-            [Paragraph("Alamat Ortu", lbl_style), Paragraph(get_v("Alamat Ayah Laki-Laki"), val_style)]
-        ]
-        
-        col_wanita = [
-            [Paragraph("DATA CATIN PEREMPUAN", head_cat), ""],
-            [Paragraph("Nama Lengkap", lbl_style), Paragraph(get_v("Nama Catin Perempuan") + " Binti " + get_v("Binti (Ayah Perempuan)"), val_style)],
-            [Paragraph("NIK / TTL", lbl_style), Paragraph(get_v("NIK Catin Perempuan") + " / " + get_v("TTL Catin Perempuan"), val_style)],
-            [Paragraph("Status / Pekerjaan", lbl_style), Paragraph(get_v("Status Perempuan") + " / " + get_v("Pekerjaan Perempuan"), val_style)],
-            [Paragraph("Alamat", lbl_style), Paragraph(get_v("Alamat Catin Perempuan"), val_style)],
-            [Paragraph("DATA ORANG TUA (AYAH & IBU) PEREMPUAN", head_cat), ""],
-            [Paragraph("Ayah / NIK", lbl_style), Paragraph(get_v("Nama Ayah Perempuan") + " / " + get_v("NIK Ayah Perempuan"), val_style)],
-            [Paragraph("TTL / Pekerjaan", lbl_style), Paragraph(get_v("TTL Ayah Perempuan") + " / " + get_v("Pekerjaan Ayah Perempuan"), val_style)],
-            [Paragraph("Ibu / NIK", lbl_style), Paragraph(get_v("Nama Ibu Perempuan") + " / " + get_v("NIK Ibu Perempuan"), val_style)],
-            [Paragraph("TTL / Pekerjaan", lbl_style), Paragraph(get_v("TTL Ibu Perempuan") + " / " + get_v("Pekerjaan Ibu Perempuan"), val_style)],
-            [Paragraph("Alamat Ortu", lbl_style), Paragraph(get_v("Alamat Ayah Perempuan"), val_style)]
-        ]
-        
-        t_pria = Table(col_pria, colWidths=[100, 340])
-        t_pria.setStyle(TableStyle([
-            ('SPAN', (0,0), (1,0)),
-            ('BACKGROUND', (0,0), (1,0), colors.HexColor("#1F4E78")),
-            ('SPAN', (0,5), (1,5)),
-            ('BACKGROUND', (0,5), (1,5), colors.HexColor("#1F4E78")),
-            ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#D5D8DC")),
-            ('TOPPADDING', (0,0), (-1,-1), 1.8),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 1.8),
-        ]))
+        elements.append(Spacer(1, 6))
 
-        t_wanita = Table(col_wanita, colWidths=[100, 340])
-        t_wanita.setStyle(TableStyle([
-            ('SPAN', (0,0), (1,0)),
-            ('BACKGROUND', (0,0), (1,0), colors.HexColor("#2E75B6")),
-            ('SPAN', (0,5), (1,5)),
-            ('BACKGROUND', (0,5), (1,5), colors.HexColor("#2E75B6")),
-            ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#D5D8DC")),
-            ('TOPPADDING', (0,0), (-1,-1), 1.8),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 1.8),
-        ]))
+        # FUNGSI PEMBUAT SECTION TABLE
+        def make_section(title, rows_data):
+            content = [[Paragraph(title, head_sec), ""]]
+            for r in rows_data:
+                content.append([Paragraph(r[0], lbl_style), Paragraph(r[1], val_style)])
+            t = Table(content, colWidths=[150, 412])
+            t.setStyle(TableStyle([
+                ('SPAN', (0,0), (1,0)),
+                ('BACKGROUND', (0,0), (1,0), colors.HexColor("#1F4E78")),
+                ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#D5D8DC")),
+                ('TOPPADDING', (0,0), (-1,-1), 3),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+                ('LEFTPADDING', (0,0), (-1,-1), 5),
+            ]))
+            return t
 
-        main_grid = Table([[t_pria, t_wanita]], colWidths=[448, 448])
-        main_grid.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('LEFTPADDING', (0,0), (-1,-1), 0),
-            ('RIGHTPADDING', (0,0), (-1,-1), 0),
-            ('TOPPADDING', (0,0), (-1,-1), 0),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-        ]))
-        elements.append(main_grid)
-        elements.append(Spacer(1, 4))
-        
-        # 3. Kelompok Wali, Mahar & Saksi (Bawah Melintang)
-        col_wali_saksi = [
-            [Paragraph("DATA WALI, MAHAR & SAKSI-SAKSI NIKAH", head_cat), "", "", ""],
+        # 2. CATIN LAKI-LAKI
+        t_pria = make_section("I. DATA CATIN LAKI-LAKI", [
+            ("Nama Lengkap & Bin", get_v("Nama Catin Laki-Laki") + " Bin " + get_v("Bin (Ayah Laki-Laki)")),
+            ("NIK / TTL / Umur", get_v("NIK Catin Laki-Laki") + " / " + get_v("TTL Catin Laki-Laki") + str_umur_l),
+            ("Status / Pekerjaan", get_v("Status Laki-Laki") + " / " + get_v("Pekerjaan Laki-Laki")),
+            ("Alamat", get_v("Alamat Catin Laki-Laki")),
+            ("Orang Tua (Ayah / Ibu)", get_v("Nama Ayah Laki-Laki") + " / " + get_v("Nama Ibu Laki-Laki"))
+        ])
+        elements.append(t_pria)
+        elements.append(Spacer(1, 6))
+
+        # 3. CATIN PEREMPUAN
+        t_wanita = make_section("II. DATA CATIN PEREMPUAN", [
+            ("Nama Lengkap & Binti", get_v("Nama Catin Perempuan") + " Binti " + get_v("Binti (Ayah Perempuan)")),
+            ("NIK / TTL / Umur", get_v("NIK Catin Perempuan") + " / " + get_v("TTL Catin Perempuan") + str_umur_p),
+            ("Status / Pekerjaan", get_v("Status Perempuan") + " / " + get_v("Pekerjaan Perempuan")),
+            ("Alamat", get_v("Alamat Catin Perempuan")),
+            ("Orang Tua (Ayah / Ibu)", get_v("Nama Ayah Perempuan") + " / " + get_v("Nama Ibu Perempuan"))
+        ])
+        elements.append(t_wanita)
+        elements.append(Spacer(1, 6))
+
+        # 4. WALI, MAHAR & SAKSI
+        t_wali = make_section("III. DATA WALI, MAHAR & SAKSI-SAKSI", [
+            ("Wali Nikah & Hubungan", get_v("Nama Wali") + " Bin " + get_v("Bin Wali") + f" ({get_v('Hubungan Wali')})"),
+            ("NIK / TTL / Pekerjaan Wali", get_v("NIK Wali") + " / " + get_v("TTL Wali") + " / " + get_v("Pekerjaan Wali")),
+            ("Mahar / Maskawin", get_v("Mahar / Maskawin")),
+            ("Saksi I", get_v("Nama Saksi 1") + " (NIK: " + get_v("NIK Saksi 1") + ")"),
+            ("Saksi II", get_v("Nama Saksi 2") + " (NIK: " + get_v("NIK Saksi 2") + ")")
+        ])
+        elements.append(t_wali)
+        elements.append(Spacer(1, 15))
+
+        # 5. KOLOM TANDA TANGAN (PETUGAS & KEPALA DESA)
+        ttd_data = [
             [
-                Paragraph("<b>Wali Nikah:</b> " + get_v("Nama Wali") + " Bin " + get_v("Bin Wali") + " (" + get_v("Hubungan Wali") + ")", val_style),
-                Paragraph("<b>NIK / TTL Wali:</b> " + get_v("NIK Wali") + " / " + get_v("TTL Wali"), val_style),
-                Paragraph("<b>Pekerjaan / Alamat:</b> " + get_v("Pekerjaan Wali") + " / " + get_v("Alamat Wali"), val_style),
-                Paragraph("<b>Mahar / Maskawin:</b> " + get_v("Mahar / Maskawin"), val_style)
+                Paragraph("Mengetahui,<br/><b>KEPALA DESA TAMBI</b>", center_style),
+                Paragraph("Desa Tambi, " + format_tanggal_indonesia(datetime.now().strftime("%Y-%m-%d")) + "<br/><b>KASI PELAYANAN DESA TAMBI</b>", center_style)
             ],
+            ["", ""],  # Ruang Tanda Tangan
             [
-                Paragraph("<b>Saksi 1:</b> " + get_v("Nama Saksi 1"), val_style),
-                Paragraph("<b>NIK / TTL Saksi 1:</b> " + get_v("NIK Saksi 1") + " / " + get_v("TTL Saksi 1"), val_style),
-                Paragraph("<b>Pekerjaan / Alamat:</b> " + get_v("Pekerjaan Saksi 1") + " / " + get_v("Alamat Saksi 1"), val_style),
-                ""
-            ],
-            [
-                Paragraph("<b>Saksi 2:</b> " + get_v("Nama Saksi 2"), val_style),
-                Paragraph("<b>NIK / TTL Saksi 2:</b> " + get_v("NIK Saksi 2") + " / " + get_v("TTL Saksi 2"), val_style),
-                Paragraph("<b>Pekerjaan / Alamat:</b> " + get_v("Pekerjaan Saksi 2") + " / " + get_v("Alamat Saksi 2"), val_style),
-                ""
+                Paragraph("<b><u>JURI</u></b>", center_bold),
+                Paragraph("<b><u>CHALIM MUCHTAROM, S.Pd.I</u></b>", center_bold)
             ]
         ]
         
-        t_ws = Table(col_wali_saksi, colWidths=[240, 220, 280, 166])
-        t_ws.setStyle(TableStyle([
-            ('SPAN', (0,0), (3,0)),
-            ('BACKGROUND', (0,0), (3,0), colors.HexColor("#34495E")),
-            ('SPAN', (2,2), (3,2)),
-            ('SPAN', (2,3), (3,3)),
-            ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#D5D8DC")),
-            ('TOPPADDING', (0,0), (-1,-1), 2),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-            ('LEFTPADDING', (0,0), (-1,-1), 4),
+        t_ttd = Table(ttd_data, colWidths=[281, 281])
+        t_ttd.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0,1), (-1,1), 35), # Jarak tanda tangan
         ]))
-        elements.append(t_ws)
+        elements.append(t_ttd)
 
         doc.build(elements)
         buffer.seek(0)
         return buffer
 
-    pdf_bytes = generate_pdf_grouped(st.session_state.get('input_data'))
+    pdf_bytes = generate_pdf_portrait_f4(st.session_state.get('input_data'))
     st.download_button(
-        label="📄 Download Laporan PDF Formal (Ter-Kelompok 1 Lembar F4)",
+        label="📄 Download Laporan PDF Portrait (1 Lembar F4 Presisi)",
         data=pdf_bytes,
-        file_name="Isian_Data_Catin_F4_Rapi.pdf",
+        file_name="Isian_Data_Catin_Desa_Tambi_F4.pdf",
         mime="application/pdf",
         use_container_width=True
     )
