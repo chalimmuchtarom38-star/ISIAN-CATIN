@@ -1,4 +1,5 @@
 import os
+import re
 import openpyxl
 import pandas as pd
 import streamlit as st
@@ -75,6 +76,49 @@ def format_tanggal_indonesia(val):
         except:
             return val_str
     return val_str
+
+def hitung_umur_dari_ttl(ttl_str):
+    """Mengekstrak tanggal dari teks TTL dan menghitung umur dalam tahun"""
+    if not ttl_str or not str(ttl_str).strip():
+        return ""
+    
+    ttl_clean = str(ttl_str).strip()
+    
+    # Cari pola tanggal YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, dll.
+    match = re.search(r'(\d{1,2})[-/\s.](\d{1,2}|[a-zA-A]+)[-/\s.](\d{2,4})', ttl_clean)
+    if not match:
+        match = re.search(r'(\d{4})[-/\s.](\d{1,2}|[a-zA-A]+)[-/\s.](\d{1,2})', ttl_clean)
+    
+    birth_date = None
+    if match:
+        parts = match.groups()
+        # Coba parse berbagai kemungkinan format tanggal
+        for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%d %m %Y", "%Y-%m-%d", "%Y/%m/%d"):
+            try:
+                date_str = f"{parts[0]}-{parts[1]}-{parts[2]}"
+                birth_date = datetime.strptime(date_str, fmt).date()
+                break
+            except ValueError:
+                pass
+        
+        # Coba parse nama bulan (contoh: 12 Mei 1995)
+        if not birth_date:
+            try:
+                p1, p2, p3 = parts[0], parts[1].upper(), parts[2]
+                month_idx = next((i for i, b in enumerate(NAMA_BULAN) if b and b.startswith(p2[:3])), None)
+                if month_idx:
+                    yr = int(p3) if len(p3) == 4 else 1900 + int(p3)
+                    birth_date = date(yr, month_idx, int(p1))
+            except:
+                pass
+
+    if birth_date:
+        today = date.today()
+        age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+        if 0 <= age <= 120:
+            return f" ({age} Tahun)"
+            
+    return ""
 
 # Pemetaan Baris Excel (1-based row index)
 MAPPING_ROWS = [
@@ -252,7 +296,7 @@ st.subheader("📥 Download Hasil Isian")
 
 col_d1, col_d2 = st.columns(2)
 
-# FUNGSI MENGEDIT FILE EXCEL MASTER .XLSX SECARA UTUH (TIDAK DIUTAK-ATIK)
+# FUNGSI MENGEDIT FILE EXCEL MASTER .XLSX SECARA UTUH (TIDAK DIUTAK-ATIK SAMA SEKALI)
 def generate_updated_xlsx(data_dict):
     output = BytesIO()
     wb = openpyxl.load_workbook(FILE_NAME)
@@ -392,6 +436,13 @@ with col_d2:
             ])
             for k in keys:
                 val_txt = str(current_data.get(k, "") or "")
+                
+                # Tambahkan kalkulasi umur secara otomatis khusus untuk field TTL di PDF
+                if "TTL" in k and val_txt:
+                    str_umur = hitung_umur_dari_ttl(val_txt)
+                    if str_umur and str_umur not in val_txt:
+                        val_txt += f"<b>{str_umur}</b>"
+                        
                 table_rows.append([
                     Paragraph(f"<b>{k}</b>", cell_bold),
                     Paragraph(val_txt, cell_norm)
