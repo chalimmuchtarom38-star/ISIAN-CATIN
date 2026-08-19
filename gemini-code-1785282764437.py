@@ -120,10 +120,11 @@ MAPPING_ROWS = [
     ("WALI_SAKSI", "Baris 80", "Alamat Saksi 2", 79)
 ]
 
-# CACHE RINGAN: Hanya membaca file 1 kali saja agar tidak memicu loading lama / blank
-@st.cache_data(show_spinner="Memuat data awal dari Excel...")
+# CACHE MEMBACA EXCEL MASTER
+@st.cache_data(show_spinner="Memuat data dari Excel...")
 def load_excel_data():
     if not os.path.exists(FILE_NAME):
+        st.error(f"File '{FILE_NAME}' tidak ditemukan! Pastikan file berada di folder yang sama.")
         return []
     try:
         excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
@@ -157,13 +158,14 @@ def load_excel_data():
 
         return extracted_data
     except Exception as e:
+        st.error(f"Gagal membaca Excel: {e}")
         return []
 
 data_list = load_excel_data()
 
 # FORM INPUT STREAMLIT
 with st.form("form_catin"):
-    st.subheader("Isi / Sesuaikan Data Catin Secara Praktis")
+    st.subheader("Isi / Sesuaikan Data Catin")
     
     t1, t2, t3, t4 = st.tabs([
         "📄 Register & Surat", 
@@ -206,13 +208,13 @@ with st.form("form_catin"):
         for group, ref, label, val in [item for item in data_list if item[0] == "WALI_SAKSI"]:
             user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
 
-    btn_simpan = st.form_submit_button("💾 Simpan Data & Siapkan PDF", use_container_width=True)
+    btn_simpan = st.form_submit_button("💾 Simpan Data & Siapkan Berkas", use_container_width=True)
 
 if btn_simpan:
     st.session_state['input_data'] = user_inputs
-    st.success("✅ Data tersimpan cepat di memori! Tombol unduh PDF tersedia di bawah.")
+    st.success("✅ Data tersimpan! Pilihan unduh file Excel dan PDF tersedia di bawah.")
 
-# PENYIAPAN NAMA FILE PDF
+# PENYIAPAN NAMA FILE
 data_saat_ini = st.session_state.get('input_data', {item[2]: item[3] for item in data_list})
 
 def bersihkan_nama_file(teks):
@@ -232,9 +234,16 @@ elif nama_catin_p:
 else:
     base_name = "BERKAS_CATIN_F4_TERUPDATE"
 
-pdf_download_name = f"{base_name}.pdf"
+# GENERATOR FILE EXCEL (.xlsx)
+def generate_excel_bytes(data_dict):
+    output = BytesIO()
+    df_data = pd.DataFrame(list(data_dict.items()), columns=["Field / Parameter", "Nilai Data"])
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_data.to_excel(writer, index=False, sheet_name="DATA_CATIN")
+    output.seek(0)
+    return output
 
-# GENERATOR PDF F4 (Ditransfers ke memori saat diminta)
+# GENERATOR PDF F4
 def generate_pdf_f4(data_dict):
     buffer = BytesIO()
     F4_PORTRAIT = portrait((612, 936))
@@ -358,14 +367,28 @@ def generate_pdf_f4(data_dict):
     return buffer
 
 st.markdown("---")
-st.subheader("📥 Download Cetak PDF (F4)")
+st.subheader("📥 Download Berkas (Excel & PDF)")
 
-# Cetak PDF dibuat secara dinamis tanpa mengganggu performa server
-pdf_bytes = generate_pdf_f4(st.session_state.get('input_data'))
-st.download_button(
-    label=f"📄 Unduh PDF F4: {pdf_download_name}",
-    data=pdf_bytes,
-    file_name=pdf_download_name,
-    mime="application/pdf",
-    use_container_width=True
-)
+col_dl1, col_dl2 = st.columns(2)
+
+with col_dl1:
+    excel_bytes = generate_excel_bytes(data_saat_ini)
+    excel_download_name = f"{base_name}.xlsx"
+    st.download_button(
+        label=f"📊 Download File Excel (.xlsx)",
+        data=excel_bytes,
+        file_name=excel_download_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+
+with col_dl2:
+    pdf_bytes = generate_pdf_f4(data_saat_ini)
+    pdf_download_name = f"{base_name}.pdf"
+    st.download_button(
+        label=f"📄 Download CETAK PDF (F4)",
+        data=pdf_bytes,
+        file_name=pdf_download_name,
+        mime="application/pdf",
+        use_container_width=True
+    )
