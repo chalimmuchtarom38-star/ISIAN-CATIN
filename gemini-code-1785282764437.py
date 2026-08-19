@@ -1,10 +1,9 @@
 import os
-import re
+import openpyxl
 import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 from io import BytesIO
-import openpyxl
 from reportlab.lib.pagesizes import landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -13,10 +12,10 @@ from reportlab.lib import colors
 st.set_page_config(page_title="Form Input Catin F4", layout="wide")
 st.title("📝 Formulir Input Isian Data Catin (F4)")
 
-FILE_NAME = "BERKAS_CATIN_F4.xlsb"
+FILE_NAME = "BERKAS_CATIN_F4.xlsx"
 
 if not os.path.exists(FILE_NAME):
-    st.error(f"File '{FILE_NAME}' tidak ditemukan di folder aplikasi! Pastikan file berada di folder yang sama dengan app.py.")
+    st.error(f"File '{FILE_NAME}' tidak ditemukan! Silakan simpan file master ke format .xlsx dengan nama BERKAS_CATIN_F4.xlsx di folder yang sama.")
     st.stop()
 
 # Daftar Nama Bulan Bahasa Indonesia
@@ -43,7 +42,7 @@ def format_tanggal_indonesia(val):
             return val_str
     return val_str
 
-# Peta Baris Excel (Excel Row Index 1-based, Kolom G / Index 7)
+# Pemetaan Baris Excel (1-based row index)
 MAPPING_ROWS = [
     ("Baris 2", "Nomor Register", 2),
     ("Baris 3", "Tanggal Surat", 3),
@@ -123,24 +122,24 @@ MAPPING_ROWS = [
 @st.cache_data(ttl=1)
 def load_excel_data():
     try:
-        excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
-        sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
-        df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
+        wb = openpyxl.load_workbook(FILE_NAME, data_only=True)
+        sheet_name = next((s for s in wb.sheetnames if s.strip().upper() == "ISIAN DATA"), wb.sheetnames[0])
+        ws = wb[sheet_name]
         
         extracted_data = []
         for ref, label, r_idx in MAPPING_ROWS:
-            val = ""
-            row_0based = r_idx - 1
-            if row_0based < len(df):
-                raw_val = df.iloc[row_0based, 6] if pd.notna(df.iloc[row_0based, 6]) else df.iloc[row_0based, 5]
-                val = format_tanggal_indonesia(raw_val)
-                if str(val).strip() == ":":
-                    val = ""
+            # Kolom G (Kolom ke-7) atau Kolom F (Kolom ke-6)
+            val = ws.cell(row=r_idx, column=7).value
+            if val is None:
+                val = ws.cell(row=r_idx, column=6).value
+            val = format_tanggal_indonesia(val)
+            if str(val).strip() == ":":
+                val = ""
             extracted_data.append((ref, label, val, r_idx))
             
         return extracted_data
     except Exception as e:
-        st.error(f"Gagal membaca Excel: {e}")
+        st.error(f"Gagal membaca file Excel: {e}")
         return []
 
 data_list = load_excel_data()
@@ -208,36 +207,33 @@ st.subheader("📥 Download Hasil Isian")
 
 col_d1, col_d2 = st.columns(2)
 
-# FUNGSI MEMPERBARUI SEL DALAM EXCEL
-def generate_updated_excel(data_dict):
+# FUNGSI MENGEDIT FILE EXCEL MASTER .XLSX SECARA UTUH
+def generate_updated_xlsx(data_dict):
     """
-    Membaca data master, menyusun ulang dataframe/sheet,
-    lalu menuliskan isian baru ke Kolom G (Kolom ke-7).
+    Membuka file Excel master .xlsx asli, menulis data baru ke sel Kolom G sheet ISIAN DATA,
+    sehingga seluruh sheet lain dan rumus tetap utuh saat di-download.
     """
     output = BytesIO()
-    excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
-    sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
+    wb = openpyxl.load_workbook(FILE_NAME)
     
-    df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
+    sheet_name = next((s for s in wb.sheetnames if s.strip().upper() == "ISIAN DATA"), wb.sheetnames[0])
+    ws = wb[sheet_name]
     
     current_inputs = data_dict if data_dict else {item[1]: item[2] for item in data_list}
-    
-    # Update data pada Kolom G (indeks kolom 6 di Pandas 0-based)
     label_to_row = {item[1]: item[2] for item in MAPPING_ROWS}
+    
     for label, val in current_inputs.items():
         if label in label_to_row:
-            r_idx = label_to_row[label] - 1  # Konversi ke 0-based index
-            if r_idx < len(df):
-                df.iloc[r_idx, 6] = val
+            r_idx = label_to_row[label]
+            # Tulis data baru ke Kolom G (Column 7)
+            ws.cell(row=r_idx, column=7, value=val)
 
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, header=False, sheet_name="ISIAN DATA")
-        
+    wb.save(output)
     output.seek(0)
     return output
 
 with col_d1:
-    excel_bytes = generate_updated_excel(st.session_state.get('input_data'))
+    excel_bytes = generate_updated_xlsx(st.session_state.get('input_data'))
     
     curr_data = st.session_state.get('input_data', {item[1]: item[2] for item in data_list})
     pria = curr_data.get("Nama Catin Laki-Laki", "").strip().upper()
@@ -245,7 +241,7 @@ with col_d1:
     file_excel_name = f"BERKAS_CATIN_{pria}_&_{wanita}.xlsx" if (pria or wanita) else "BERKAS_CATIN_TERISI.xlsx"
 
     st.download_button(
-        label="📊 Download File Excel Terisi (.xlsx)",
+        label="📊 Download File Excel Terisi Utuh (.xlsx)",
         data=excel_bytes,
         file_name=file_excel_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
