@@ -1,144 +1,101 @@
-import streamlit as st
+import os
 import pandas as pd
+import streamlit as st
 from io import BytesIO
 from reportlab.lib.pagesizes import landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-# ---------------------------------------------------------
-# 1. KONFIGURASI HALAMAN STREAMLIT
-# ---------------------------------------------------------
-st.set_page_config(
-    page_title="Sistem Input Data & Ringkasan F4",
-    layout="wide"
-)
+# 1. Konfigurasi Halaman
+st.set_page_config(page_title="Sistem Isian Data & PDF F4", layout="wide")
+st.title("📋 Aplikasi Isian Data & Laporan")
 
-st.title("📋 Form Isian Data & Export Laporan")
-st.markdown("---")
+# Nama file Excel bawaan di folder
+FILE_NAME = "BERKAS_CATIN_F4.xlsb"
 
-# Ukuran Kertas F4 dalam Point (215.9 mm x 330.2 mm)
-F4_SIZE = (612, 936) 
-F4_LANDSCAPE = landscape(F4_SIZE)
+# 2. Cek apakah file ada di folder
+if os.path.exists(FILE_NAME):
+    # Baca file asli sebagai Bytes agar tidak merusak rumus saat didownload
+    with open(FILE_NAME, "rb") as f:
+        original_bytes = f.read()
 
-# ---------------------------------------------------------
-# 2. UPLOAD FILE EXCEL SUMBER (ASLI)
-# ---------------------------------------------------------
-uploaded_file = st.sidebar.file_uploader(
-    "Unggah File Excel Utama (.xlsx / .xlsb)", 
-    type=["xlsx", "xlsb"]
-)
-
-if uploaded_file is not None:
-    # Simpan byte file asli agar file tidak berubah/rusak sedikitpun saat didownload ulang
-    original_bytes = uploaded_file.getvalue()
-
-    st.subheader("1. Form Isian Data")
-    st.info("💡 Isi data pada form di bawah ini. Semua kolom diambil lengkap dari sheet utama tanpa ada yang dikurangi.")
-
-    # ---------------------------------------------------------
-    # 3. BACA SHEET "ISIAN DATA" DENGAN PANDAS
-    # ---------------------------------------------------------
     try:
-        # Menampilkan sheet 'isian data' (atau sheet pertama jika nama sheet bervariasi)
-        excel_file = pd.ExcelFile(uploaded_file)
-        sheet_target = "isian data" if "isian data" in [s.lower() for s in excel_file.sheet_names] else excel_file.sheet_names[0]
+        # Baca daftar sheet menggunakan engine pyxlsb
+        excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
+        sheet_names = excel_file.sheet_names
         
-        df_source = pd.read_excel(uploaded_file, sheet_name=sheet_target)
+        # Cari sheet 'isian data'
+        target_sheet = "isian data" if "isian data" in [s.lower() for s in sheet_names] else sheet_names[0]
+        
+        # Baca isi sheet secara utuh tanpa mengurangi kolom
+        df = pd.read_excel(FILE_NAME, sheet_name=target_sheet, engine='pyxlsb')
 
-        # Menampilkan Dataframe yang dapat diisi/diedit pengguna di web
-        edited_df = st.data_editor(
-            df_source,
-            num_rows="dynamic",
-            use_container_width=True,
-            key="data_editor"
-        )
+        st.subheader(f"1. Isian Data (Sheet: {target_sheet})")
+        st.caption("Semua kolom ditampilkan lengkap. Anda bisa langsung mengedit tabel di bawah ini.")
+
+        # Tabel Interaktif
+        edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 
         st.markdown("---")
-        st.subheader("2. Panel Fitur & Download")
+        st.subheader("2. Tombol Download")
 
         col1, col2 = st.columns(2)
 
-        # ---------------------------------------------------------
-        # FITUR A: DOWNLOAD FILE EXCEL UTUH (ORIGINAL)
-        # ---------------------------------------------------------
+        # --- TOMBOL 1: DOWNLOAD EXCEL UTUH ---
         with col1:
-            st.markdown("### 📥 Download Excel")
-            st.caption("Mendownload file Excel asli beserta seluruh sheet, struktur, dan rumus di dalamnya.")
             st.download_button(
-                label="Download File Excel Utuh (.xlsx)",
+                label="📥 Download File Excel Utuh (.xlsb)",
                 data=original_bytes,
-                file_name="File_Utuh_Sistem.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                file_name=FILE_NAME,
+                mime="application/vnd.ms-excel.sheet.binary.macroenabled.12",
                 use_container_width=True
             )
 
-        # ---------------------------------------------------------
-        # FITUR B: GENERATE & DOWNLOAD PDF 1 LEMBAR F4
-        # ---------------------------------------------------------
-        def generate_pdf_f4(df):
+        # --- TOMBOL 2: DOWNLOAD PDF F4 (1 LEMBAR) ---
+        def make_pdf(dataframe):
             buffer = BytesIO()
-            # Set margin pas agar muat tepat 1 lembar F4
-            doc = SimpleDocTemplate(
-                buffer, 
-                pagesize=F4_LANDSCAPE,
-                rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20
-            )
+            # Ukuran Kertas F4 Landscape
+            F4_SIZE = landscape((612, 936))
+            doc = SimpleDocTemplate(buffer, pagesize=F4_SIZE, rightMargin=15, leftMargin=15, topMargin=15, bottomMargin=15)
+            
             elements = []
             styles = getSampleStyleSheet()
-
-            # Judul Laporan
-            title_style = ParagraphStyle(
-                'TitleStyle',
-                parent=styles['Heading1'],
-                fontSize=14,
-                leading=16,
-                alignment=1, # Center
-                spaceAfter=10
-            )
-            elements.append(Paragraph("<b>RINGKASAN ISIAN DATA LAPORAN</b>", title_style))
-            elements.append(Spacer(1, 5))
-
-            # Konversi seluruh isi DataFrame ke format tabel ReportLab
-            table_data = [list(df.columns)] # Header
-            for idx, row in df.iterrows():
-                row_data = [str(val) if pd.notna(val) else "" for val in row]
-                table_data.append(row_data)
-
-            # Style Tabel PDF
+            
+            title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=12, alignment=1, spaceAfter=8)
+            elements.append(Paragraph("<b>RINGKASAN ISIAN DATA</b>", title_style))
+            
+            # Buat Data Tabel
+            table_data = [list(dataframe.columns)]
+            for _, row in dataframe.iterrows():
+                table_data.append([str(val) if pd.notna(val) else "" for val in row])
+            
             pdf_table = Table(table_data, repeatRows=1)
             pdf_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ]))
-
+            
             elements.append(pdf_table)
             doc.build(elements)
             buffer.seek(0)
             return buffer
 
         with col2:
-            st.markdown("### 📄 Download PDF Ringkasan F4")
-            st.caption("Mencetak seluruh kolom 'Isian Data' ke dalam PDF 1 Lembar Ukuran F4.")
-            
-            pdf_bytes = generate_pdf_f4(edited_df)
-            
+            pdf_bytes = make_pdf(edited_df)
             st.download_button(
-                label="Download Ringkasan PDF (F4)",
+                label="📄 Download Ringkasan PDF (Ukuran F4)",
                 data=pdf_bytes,
                 file_name="Ringkasan_Isian_Data_F4.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
 
-    except Exception as e:
-        st.error(f"Terjadi kesalahan saat memproses file Excel: {e}")
+    except Exception as err:
+        st.error(f"Gagal memproses file: {err}")
 
 else:
-    st.warning("👈 Silakan unggah file Excel Anda melalui menu di sebelah kiri untuk memulai.")
+    st.error(f"File '{FILE_NAME}' tidak ditemukan di folder aplikasi! Pastikan nama file sudah sesuai.")
