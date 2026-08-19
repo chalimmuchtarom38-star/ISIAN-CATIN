@@ -1,8 +1,10 @@
 import os
+import re
 import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 from io import BytesIO
+import openpyxl
 from reportlab.lib.pagesizes import landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -41,6 +43,83 @@ def format_tanggal_indonesia(val):
             return val_str
     return val_str
 
+# Peta Baris Excel (Excel Row Index 1-based, Kolom G / Index 7)
+MAPPING_ROWS = [
+    ("Baris 2", "Nomor Register", 2),
+    ("Baris 3", "Tanggal Surat", 3),
+    ("Baris 4", "Tanggal Pelaksanaan", 4),
+    ("Baris 5", "Jam Pelaksanaan", 5),
+    ("Baris 6", "Tempat Akad Nikah", 6),
+    
+    # Catin Laki-Laki
+    ("Baris 8", "Nama Catin Laki-Laki", 8),
+    ("Baris 9", "Bin (Ayah Laki-Laki)", 9),
+    ("Baris 10", "TTL Catin Laki-Laki", 10),
+    ("Baris 11", "NIK Catin Laki-Laki", 11),
+    ("Baris 12", "Pekerjaan Laki-Laki", 12),
+    ("Baris 13", "Status Laki-Laki", 13),
+    ("Baris 14", "Jenis Kelamin Laki-Laki", 14),
+    ("Baris 15", "Nama Istri Terdahulu", 15),
+    ("Baris 16", "Alamat Catin Laki-Laki", 16),
+    ("Baris 17", "Pendidikan Laki-Laki", 17),
+    
+    # Ortu Laki-Laki
+    ("Baris 19", "Nama Ayah Laki-Laki", 19),
+    ("Baris 20", "NIK Ayah Laki-Laki", 20),
+    ("Baris 21", "TTL Ayah Laki-Laki", 21),
+    ("Baris 22", "Pekerjaan Ayah Laki-Laki", 22),
+    ("Baris 23", "Alamat Ayah Laki-Laki", 23),
+    ("Baris 26", "Nama Ibu Laki-Laki", 26),
+    ("Baris 27", "NIK Ibu Laki-Laki", 27),
+    ("Baris 28", "TTL Ibu Laki-Laki", 28),
+    ("Baris 29", "Pekerjaan Ibu Laki-Laki", 29),
+    ("Baris 30", "Alamat Ibu Laki-Laki", 30),
+    
+    # Catin Perempuan
+    ("Baris 34", "Nama Catin Perempuan", 34),
+    ("Baris 35", "Binti (Ayah Perempuan)", 35),
+    ("Baris 36", "TTL Catin Perempuan", 36),
+    ("Baris 37", "NIK Catin Perempuan", 37),
+    ("Baris 38", "Pekerjaan Perempuan", 38),
+    ("Baris 39", "Status Perempuan", 39),
+    ("Baris 40", "Jenis Kelamin Perempuan", 40),
+    ("Baris 41", "Alamat Catin Perempuan", 41),
+    ("Baris 42", "Nama Suami Terdahulu", 42),
+    ("Baris 43", "Pendidikan Perempuan", 43),
+    
+    # Ortu Perempuan
+    ("Baris 45", "Nama Ayah Perempuan", 45),
+    ("Baris 46", "NIK Ayah Perempuan", 46),
+    ("Baris 47", "TTL Ayah Perempuan", 47),
+    ("Baris 48", "Pekerjaan Ayah Perempuan", 48),
+    ("Baris 49", "Alamat Ayah Perempuan", 49),
+    ("Baris 52", "Nama Ibu Perempuan", 52),
+    ("Baris 53", "NIK Ibu Perempuan", 53),
+    ("Baris 54", "TTL Ibu Perempuan", 54),
+    ("Baris 55", "Pekerjaan Ibu Perempuan", 55),
+    ("Baris 56", "Alamat Ibu Perempuan", 56),
+    
+    # Wali & Saksi
+    ("Baris 58", "Nama Wali", 58),
+    ("Baris 59", "Bin Wali", 59),
+    ("Baris 60", "NIK Wali", 60),
+    ("Baris 61", "TTL Wali", 61),
+    ("Baris 62", "Pekerjaan Wali", 62),
+    ("Baris 63", "Alamat Wali", 63),
+    ("Baris 64", "Hubungan Wali", 64),
+    ("Baris 65", "Mahar / Maskawin", 65),
+    ("Baris 70", "Nama Saksi 1", 70),
+    ("Baris 71", "TTL Saksi 1", 71),
+    ("Baris 72", "NIK Saksi 1", 72),
+    ("Baris 73", "Pekerjaan Saksi 1", 73),
+    ("Baris 74", "Alamat Saksi 1", 74),
+    ("Baris 76", "Nama Saksi 2", 76),
+    ("Baris 77", "TTL Saksi 2", 77),
+    ("Baris 78", "NIK Saksi 2", 78),
+    ("Baris 79", "Pekerjaan Saksi 2", 79),
+    ("Baris 80", "Alamat Saksi 2", 80)
+]
+
 @st.cache_data(ttl=1)
 def load_excel_data():
     try:
@@ -48,91 +127,16 @@ def load_excel_data():
         sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
         df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
         
-        mapping_rows = [
-            ("Baris 2", "Nomor Register", 1),
-            ("Baris 3", "Tanggal Surat", 2),
-            ("Baris 4", "Tanggal Pelaksanaan", 3),
-            ("Baris 5", "Jam Pelaksanaan", 4),
-            ("Baris 6", "Tempat Akad Nikah", 5),
-            
-            # Catin Laki-Laki
-            ("Baris 8", "Nama Catin Laki-Laki", 7),
-            ("Baris 9", "Bin (Ayah Laki-Laki)", 8),
-            ("Baris 10", "TTL Catin Laki-Laki", 9),
-            ("Baris 11", "NIK Catin Laki-Laki", 10),
-            ("Baris 12", "Pekerjaan Laki-Laki", 11),
-            ("Baris 13", "Status Laki-Laki", 12),
-            ("Baris 14", "Jenis Kelamin Laki-Laki", 13),
-            ("Baris 15", "Nama Istri Terdahulu", 14),
-            ("Baris 16", "Alamat Catin Laki-Laki", 15),
-            ("Baris 17", "Pendidikan Laki-Laki", 16),
-            
-            # Ortu Laki-Laki
-            ("Baris 19", "Nama Ayah Laki-Laki", 18),
-            ("Baris 20", "NIK Ayah Laki-Laki", 19),
-            ("Baris 21", "TTL Ayah Laki-Laki", 20),
-            ("Baris 22", "Pekerjaan Ayah Laki-Laki", 21),
-            ("Baris 23", "Alamat Ayah Laki-Laki", 22),
-            ("Baris 26", "Nama Ibu Laki-Laki", 25),
-            ("Baris 27", "NIK Ibu Laki-Laki", 26),
-            ("Baris 28", "TTL Ibu Laki-Laki", 27),
-            ("Baris 29", "Pekerjaan Ibu Laki-Laki", 28),
-            ("Baris 30", "Alamat Ibu Laki-Laki", 29),
-            
-            # Catin Perempuan
-            ("Baris 34", "Nama Catin Perempuan", 33),
-            ("Baris 35", "Binti (Ayah Perempuan)", 34),
-            ("Baris 36", "TTL Catin Perempuan", 35),
-            ("Baris 37", "NIK Catin Perempuan", 36),
-            ("Baris 38", "Pekerjaan Perempuan", 37),
-            ("Baris 39", "Status Perempuan", 38),
-            ("Baris 40", "Jenis Kelamin Perempuan", 39),
-            ("Baris 41", "Alamat Catin Perempuan", 40),
-            ("Baris 42", "Nama Suami Terdahulu", 41),
-            ("Baris 43", "Pendidikan Perempuan", 42),
-            
-            # Ortu Perempuan
-            ("Baris 45", "Nama Ayah Perempuan", 44),
-            ("Baris 46", "NIK Ayah Perempuan", 45),
-            ("Baris 47", "TTL Ayah Perempuan", 46),
-            ("Baris 48", "Pekerjaan Ayah Perempuan", 47),
-            ("Baris 49", "Alamat Ayah Perempuan", 48),
-            ("Baris 52", "Nama Ibu Perempuan", 51),
-            ("Baris 53", "NIK Ibu Perempuan", 52),
-            ("Baris 54", "TTL Ibu Perempuan", 53),
-            ("Baris 55", "Pekerjaan Ibu Perempuan", 54),
-            ("Baris 56", "Alamat Ibu Perempuan", 55),
-            
-            # Wali & Saksi
-            ("Baris 58", "Nama Wali", 57),
-            ("Baris 59", "Bin Wali", 58),
-            ("Baris 60", "NIK Wali", 59),
-            ("Baris 61", "TTL Wali", 60),
-            ("Baris 62", "Pekerjaan Wali", 61),
-            ("Baris 63", "Alamat Wali", 62),
-            ("Baris 64", "Hubungan Wali", 63),
-            ("Baris 65", "Mahar / Maskawin", 64),
-            ("Baris 70", "Nama Saksi 1", 69),
-            ("Baris 71", "TTL Saksi 1", 70),
-            ("Baris 72", "NIK Saksi 1", 71),
-            ("Baris 73", "Pekerjaan Saksi 1", 72),
-            ("Baris 74", "Alamat Saksi 1", 73),
-            ("Baris 76", "Nama Saksi 2", 75),
-            ("Baris 77", "TTL Saksi 2", 76),
-            ("Baris 78", "NIK Saksi 2", 77),
-            ("Baris 79", "Pekerjaan Saksi 2", 78),
-            ("Baris 80", "Alamat Saksi 2", 79)
-        ]
-        
         extracted_data = []
-        for ref, label, r_idx in mapping_rows:
+        for ref, label, r_idx in MAPPING_ROWS:
             val = ""
-            if r_idx < len(df):
-                raw_val = df.iloc[r_idx, 6] if pd.notna(df.iloc[r_idx, 6]) else df.iloc[r_idx, 5]
+            row_0based = r_idx - 1
+            if row_0based < len(df):
+                raw_val = df.iloc[row_0based, 6] if pd.notna(df.iloc[row_0based, 6]) else df.iloc[row_0based, 5]
                 val = format_tanggal_indonesia(raw_val)
-                if val.strip() == ":":
+                if str(val).strip() == ":":
                     val = ""
-            extracted_data.append((ref, label, val))
+            extracted_data.append((ref, label, val, r_idx))
             
         return extracted_data
     except Exception as e:
@@ -156,73 +160,103 @@ with st.form("form_catin"):
 
     with t1:
         st.markdown("##### Data Surat & Pelaksanaan Akad")
-        for ref, label, val in data_list[:5]:
-            user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
+        for ref, label, val, row_num in data_list[:5]:
+            user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
 
     with t2:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("##### -- Data Catin Laki-Laki --")
-            for ref, label, val in data_list[5:15]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
+            for ref, label, val, row_num in data_list[5:15]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
         with col2:
             st.markdown("##### -- Data Orang Tua Laki-Laki --")
-            for ref, label, val in data_list[15:25]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
+            for ref, label, val, row_num in data_list[15:25]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
 
     with t3:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("##### -- Data Catin Perempuan --")
-            for ref, label, val in data_list[25:35]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
+            for ref, label, val, row_num in data_list[25:35]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
         with col2:
             st.markdown("##### -- Data Orang Tua Perempuan --")
-            for ref, label, val in data_list[35:45]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
+            for ref, label, val, row_num in data_list[35:45]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
 
     with t4:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("##### -- Data Wali & Mahar --")
-            for ref, label, val in data_list[45:53]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
+            for ref, label, val, row_num in data_list[45:53]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
         with col2:
             st.markdown("##### -- Data Saksi 1 & Saksi 2 --")
-            for ref, label, val in data_list[53:]:
-                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
+            for ref, label, val, row_num in data_list[53:]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val, key=f"inp_{row_num}")
 
     btn_simpan = st.form_submit_button("💾 Simpan & Perbarui Data Input", use_container_width=True)
 
 if btn_simpan:
     st.session_state['input_data'] = user_inputs
-    st.success("✅ Data berhasil diperbarui!")
+    st.success("✅ Data berhasil diperbarui di memori sistem!")
 
 # PANEL DOWNLOAD RESULT
 st.markdown("---")
-st.subheader("📥 Download Hasil")
+st.subheader("📥 Download Hasil Isian")
 
 col_d1, col_d2 = st.columns(2)
 
+# FUNGSI MEMPERBARUI SEL DALAM EXCEL
+def generate_updated_excel(data_dict):
+    """
+    Membaca data master, menyusun ulang dataframe/sheet,
+    lalu menuliskan isian baru ke Kolom G (Kolom ke-7).
+    """
+    output = BytesIO()
+    excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
+    sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
+    
+    df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
+    
+    current_inputs = data_dict if data_dict else {item[1]: item[2] for item in data_list}
+    
+    # Update data pada Kolom G (indeks kolom 6 di Pandas 0-based)
+    label_to_row = {item[1]: item[2] for item in MAPPING_ROWS}
+    for label, val in current_inputs.items():
+        if label in label_to_row:
+            r_idx = label_to_row[label] - 1  # Konversi ke 0-based index
+            if r_idx < len(df):
+                df.iloc[r_idx, 6] = val
+
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, header=False, sheet_name="ISIAN DATA")
+        
+    output.seek(0)
+    return output
+
 with col_d1:
-    with open(FILE_NAME, "rb") as f:
-        file_bytes = f.read()
+    excel_bytes = generate_updated_excel(st.session_state.get('input_data'))
+    
+    curr_data = st.session_state.get('input_data', {item[1]: item[2] for item in data_list})
+    pria = curr_data.get("Nama Catin Laki-Laki", "").strip().upper()
+    wanita = curr_data.get("Nama Catin Perempuan", "").strip().upper()
+    file_excel_name = f"BERKAS_CATIN_{pria}_&_{wanita}.xlsx" if (pria or wanita) else "BERKAS_CATIN_TERISI.xlsx"
+
     st.download_button(
-        label="📥 Download File Excel Utama (.xlsb)",
-        data=file_bytes,
-        file_name=FILE_NAME,
-        mime="application/vnd.ms-excel.sheet.binary.macroenabled.12",
+        label="📊 Download File Excel Terisi (.xlsx)",
+        data=excel_bytes,
+        file_name=file_excel_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
 
 with col_d2:
-    # FUNGSI PEMBUATAN PDF FORMAL 1 LEMBAR UKURAN F4 (LANDSCAPE)
     def generate_pdf_formal(data_dict):
         buffer = BytesIO()
-        # Ukuran F4 Landscape dalam Point (8.5 x 13 Inci)
         F4_LANDSCAPE = landscape((612, 936))
         
-        # Margin hemat tempat agar pas 1 halaman
         doc = SimpleDocTemplate(
             buffer, 
             pagesize=F4_LANDSCAPE, 
@@ -234,7 +268,6 @@ with col_d2:
         elements = []
         styles = getSampleStyleSheet()
         
-        # Style Header
         header_style = ParagraphStyle(
             'HeaderStyle',
             parent=styles['Heading1'],
@@ -258,12 +291,10 @@ with col_d2:
         cell_bold = ParagraphStyle('CB', fontSize=6.5, leading=7.5, fontName='Helvetica-Bold')
         cell_norm = ParagraphStyle('CN', fontSize=6.5, leading=7.5, fontName='Helvetica')
         
-        # Judul Dokumen
         elements.append(Paragraph("RINGKASAN ISIAN DATA BERKAS CATIN (F4)", header_style))
         elements.append(Paragraph("Daftar Pemeriksaan & Verifikasi Data Pernikahan", sub_header_style))
         elements.append(Spacer(1, 6))
         
-        # Menyiapkan Data Pasangan Kolom (4 Kolom Layout: Field1, Isi1, Field2, Isi2)
         current_data = data_dict if data_dict else {item[1]: item[2] for item in data_list}
         items = list(current_data.items())
         
@@ -288,7 +319,6 @@ with col_d2:
                 Paragraph(str(v2) if v2 else "", cell_norm)
             ])
             
-        # Lebar Kolom Total = 906 pt (Muat di Kertas F4 936 pt)
         col_widths = [160, 293, 160, 293]
         
         pdf_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
