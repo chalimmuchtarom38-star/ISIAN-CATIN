@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 from io import BytesIO
+import re
 from reportlab.lib.pagesizes import portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -40,6 +41,28 @@ def format_tanggal_indonesia(val):
         except:
             return val_str
     return val_str
+
+# FUNGSI BACKUP UNTUK MEMASTIKAN UMUR TEPAT JIKA RUMUS EXEL BELUM TER-UPDATE/RECALCULATE
+def dapatkan_umur_presisi(ttl_str, umur_raw_excel=""):
+    # Prioritaskan jika nilai dari Excel sudah benar (>10 tahun)
+    if umur_raw_excel:
+        clean_u = re.sub(r'[^0-9]', '', str(umur_raw_excel))
+        if clean_u.isdigit() and int(clean_u) >= 10:
+            return f"{clean_u} TAHUN"
+            
+    # Jika hasil pembacaan formula Excel lama/statis (misal 27), kalkulasikan otomatis berdasarkan tahun lahir
+    if ttl_str:
+        try:
+            tahun_sekarang = datetime.now().year
+            years = re.findall(r'\b(19\d\d|20\d\d)\b', str(ttl_str))
+            if years:
+                tahun_lahir = int(years[-1])
+                umur = tahun_sekarang - tahun_lahir
+                if 10 <= umur <= 100:
+                    return f"{umur} TAHUN"
+        except:
+            pass
+    return str(umur_raw_excel) if umur_raw_excel else ""
 
 @st.cache_data(ttl=1)
 def load_excel_data():
@@ -124,27 +147,18 @@ def load_excel_data():
             ("WALI_SAKSI", "Baris 79", "Pekerjaan Saksi 2", 78),
             ("WALI_SAKSI", "Baris 80", "Alamat Saksi 2", 79)
         ]
-        
-        # PENCARI NILAI UMUR DINAMIS DI SISI KOLOM EXCEL (Baris 9 -> Pria, Baris 35 -> Wanita)
-        umur_pria = ""
-        umur_wanita = ""
+
+        extracted_data = []
+        ttl_l, ttl_p = "", ""
+        raw_u_l, raw_u_p = "", ""
+
+        # Ambil nilai mentah dari Excel
         try:
-            # Baris 10 (Index 9) -> Catin Pria (Cek Kolom G, H, I, J, K)
-            for col_i in range(6, 12):
-                c_val = str(df.iloc[9, col_i]) if pd.notna(df.iloc[9, col_i]) else ""
-                if "TH" in c_val.upper() or "TAHUN" in c_val.upper() or (c_val.isdigit() and int(c_val) < 100):
-                    umur_pria = c_val.strip()
-                    break
-            # Baris 36 (Index 35) -> Catin Wanita
-            for col_i in range(6, 12):
-                c_val = str(df.iloc[35, col_i]) if pd.notna(df.iloc[35, col_i]) else ""
-                if "TH" in c_val.upper() or "TAHUN" in c_val.upper() or (c_val.isdigit() and int(c_val) < 100):
-                    umur_wanita = c_val.strip()
-                    break
+            raw_u_l = df.iloc[9, 10] if df.shape[1] > 10 and pd.notna(df.iloc[9, 10]) else ""
+            raw_u_p = df.iloc[35, 10] if df.shape[1] > 10 and pd.notna(df.iloc[35, 10]) else ""
         except:
             pass
 
-        extracted_data = []
         for group, ref, label, r_idx in mapping_rows:
             val = ""
             if r_idx < len(df):
@@ -152,11 +166,17 @@ def load_excel_data():
                 val = format_tanggal_indonesia(raw_val)
                 if val.strip() == ":":
                     val = ""
+            
+            if label == "TTL Catin Laki-Laki":
+                ttl_l = val
+            elif label == "TTL Catin Perempuan":
+                ttl_p = val
+                
             extracted_data.append((group, ref, label, val))
             
-        # Sisipkan Umur Otomatis
-        extracted_data.append(("CATIN_L", "Baris 10", "Umur Catin Laki-Laki", umur_pria))
-        extracted_data.append(("CATIN_P", "Baris 36", "Umur Catin Perempuan", umur_wanita))
+        # Penyesuaian Umur Presisi
+        extracted_data.append(("CATIN_L", "Baris 10", "Umur Catin Laki-Laki", dapatkan_umur_presisi(ttl_l, raw_u_l)))
+        extracted_data.append(("CATIN_P", "Baris 36", "Umur Catin Perempuan", dapatkan_umur_presisi(ttl_p, raw_u_p)))
 
         return extracted_data
     except Exception as e:
@@ -234,7 +254,6 @@ with col_d1:
     )
 
 with col_d2:
-    # FUNGSI PEMBUATAN PDF PORTRAIT F4 LENGKAP & PRESISI
     def generate_pdf_portrait_f4(data_dict):
         buffer = BytesIO()
         F4_PORTRAIT = portrait((612, 936))
@@ -329,7 +348,7 @@ with col_d2:
         elements.append(t_wanita)
         elements.append(Spacer(1, 5))
 
-        # 4. DATA WALI (DIJAMIN LENGKAP) & SAKSI
+        # 4. DATA WALI & SAKSI
         t_wali = make_section("III. DATA WALI NIKAH, MAHAR & SAKSI-SAKSI", [
             ("Nama Wali / Bin", get_v("Nama Wali") + " Bin " + get_v("Bin Wali") + f" ({get_v('Hubungan Wali')})"),
             ("NIK / TTL Wali", get_v("NIK Wali") + " / " + get_v("TTL Wali")),
@@ -341,13 +360,13 @@ with col_d2:
         elements.append(t_wali)
         elements.append(Spacer(1, 12))
 
-        # 5. KOLOM TANDA TANGAN (POSISI DISESUAIKAN: KANAN = KASI PELAYANAN, KIRI = KADES)
+        # 5. KOLOM TANDA TANGAN
         ttd_data = [
             [
                 Paragraph("Mengetahui,<br/><b>KEPALA DESA TAMBI</b>", center_style),
                 Paragraph("Desa Tambi, " + format_tanggal_indonesia(datetime.now().strftime("%Y-%m-%d")) + "<br/><b>KASI PELAYANAN DESA TAMBI</b>", center_style)
             ],
-            ["", ""],  # Space TTD
+            ["", ""],
             [
                 Paragraph("<b><u>JURI</u></b>", center_bold),
                 Paragraph("<b><u>CHALIM MUCHTAROM, S.Pd.I</u></b>", center_bold)
@@ -368,7 +387,7 @@ with col_d2:
 
     pdf_bytes = generate_pdf_portrait_f4(st.session_state.get('input_data'))
     st.download_button(
-        label="📄 Download Laporan PDF Portrait (1 Lembar F4 Sesuai)",
+        label="📄 Download Laporan PDF Portrait (1 Lembar F4 Presisi)",
         data=pdf_bytes,
         file_name="Isian_Data_Catin_Desa_Tambi_F4.pdf",
         mime="application/pdf",
