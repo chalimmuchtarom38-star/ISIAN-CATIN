@@ -13,150 +13,171 @@ st.title("📝 Formulir Input Isian Data Catin (F4)")
 FILE_NAME = "BERKAS_CATIN_F4.xlsb"
 
 if not os.path.exists(FILE_NAME):
-    st.error(f"File '{FILE_NAME}' tidak ditemukan di folder aplikasi! Pastikan nama file sudah pas.")
+    st.error(f"File '{FILE_NAME}' tidak ditemukan di folder aplikasi! Pastikan file berada di folder yang sama dengan app.py.")
     st.stop()
 
-# Daftar Field Seleksi Khusus dari Kolom B (Baris 2 s/d 80)
-FIELD_MAPPING = [
-    # --- DATA SURAT & AKAD NIKAH ---
-    ("B2", "Nomor Register", "400.12.3.2/010/ VIII/ 2026"),
-    ("B3", "Tanggal Surat", "TAMBI, 11 AGUSTUS 2026"),
-    ("B4", "Tanggal Pelaksanaan", ""),
-    ("B5", "Jam Pelaksanaan", "JAM. 08.00"),
-    ("B6", "Tempat Akad Nikah", "RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang"),
-    
-    # --- CATIN LAKI-LAKI ---
-    ("B8", "Nama Catin Laki-Laki", "MIfahul Anam"),
-    ("B9", "Bin (Ayah Laki-Laki)", "Nur Karim"),
-    ("B10", "Tempat, Tanggal Lahir (Laki-Laki)", "Pemalang, 18 Februari 1999"),
-    ("B11", "NIK (Laki-Laki)", "3327031802990004"),
-    ("B12", "Pekerjaan (Laki-Laki)", "Swasta"),
-    ("B13", "Status (Laki-Laki)", "BELUM KAWIN"),
-    ("B14", "Jenis Kelamin (Laki-Laki)", "Laki-Laki"),
-    ("B15", "Nama Istri Terdahulu", ""),
-    ("B16", "Alamat (Laki-Laki)", "RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang"),
-    ("B17", "Pendidikan (Laki-Laki)", "SLTA"),
-    
-    # --- ORANG TUA LAKI-LAKI ---
-    ("B19", "Nama Ayah Laki-Laki", "Nur Karim"),
-    ("B20", "NIK Ayah Laki-Laki", "3327030608680006"),
-    ("B21", "TTL Ayah Laki-Laki", "Pemalang, 06 Agustus 1968"),
-    ("B22", "Pekerjaan Ayah Laki-Laki", "PETANI/ PEKEBUN"),
-    ("B23", "Alamat Ayah Laki-Laki", "RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang"),
-    ("B26", "Nama Ibu Laki-Laki", "Samijah"),
-    ("B27", "NIK Ibu Laki-Laki", "3327035405740004"),
-    ("B28", "TTL Ibu Laki-Laki", "Pemalang, 14 Mei 1974"),
-    ("B29", "Pekerjaan Ibu Laki-Laki", "Mengurus Rumah Tangga"),
-    ("B30", "Alamat Ibu Laki-Laki", "RT 002 RW 001 Desa Badak Kecamatan Belik Kabupaten Pemalang"),
-    
-    # --- CATIN PEREMPUAN ---
-    ("B34", "Nama Catin Perempuan", "Diyan Solehatin"),
-    ("B35", "Binti (Ayah Perempuan)", "Disun"),
-    ("B36", "Tempat, Tanggal Lahir (Perempuan)", "Pemalang, 29 Juni 2007"),
-    ("B37", "NIK (Perempuan)", "3327046906070010"),
-    ("B38", "Pekerjaan (Perempuan)", "BELUM/ TIDAK BEKERJA"),
-    ("B39", "Status (Perempuan)", "BELUM KAWIN"),
-    ("B40", "Jenis Kelamin (Perempuan)", "PEREMPUAN"),
-    ("B41", "Alamat (Perempuan)", "RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang"),
-    ("B42", "Nama Suami Terdahulu", ""),
-    ("B43", "Pendidikan (Perempuan)", "SLTP"),
-    
-    # --- ORANG TUA PEREMPUAN ---
-    ("B45", "Nama Ayah Perempuan", "Disun"),
-    ("B46", "NIK Ayah Perempuan", "3327042504840003"),
-    ("B47", "TTL Ayah Perempuan", "Pemalang, 21 April 1989"),
-    ("B48", "Pekerjaan Ayah Perempuan", "PETANI/ PEKEBUN"),
-    ("B49", "Alamat Ayah Perempuan", "RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang"),
-    ("B52", "Nama Ibu Perempuan", "Mutirah"),
-    ("B53", "NIK Ibu Perempuan", "3327044411840003"),
-    ("B54", "TTL Ibu Perempuan", "Pemalang, 04 November 1984"),
-    ("B55", "Pekerjaan Ibu Perempuan", "Mengurus Rumah Tangga"),
-    ("B56", "Alamat Ibu Perempuan", "RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang"),
-    
-    # --- WALI & SAKSI ---
-    ("B58", "Nama Wali", "Disun"),
-    ("B59", "Bin Wali", "Tawiroji"),
-    ("B60", "NIK Wali", "3327042504840003"),
-    ("B61", "TTL Wali", "PEMALANG, 21 April 1984"),
-    ("B62", "Pekerjaan Wali", "PETANI/ PEKEBUN"),
-    ("B63", "Alamat Wali", "RT 004 RW 001 Desa Tambi Kecamatan Watukumpul Kabupaten Pemalang"),
-    ("B64", "Hubungan Wali", "AYAH KANDUNG"),
-    ("B65", "Mahar / Maskawin", "Seperangkat Alat Sholat"),
-    ("B70", "Nama Saksi 1", "Chalim Muchtarom"),
-    ("B71", "TTL Saksi 1", "Pemalang, 21 Oktober 1989"),
-    ("B72", "NIK Saksi 1", "3327042110890004"),
-    ("B73", "Pekerjaan Saksi 1", "Perangkat Desa"),
-    ("B74", "Alamat Saksi 1", "RT 002 RW 001 Desa Tambi Kecamatan Watukumpu Kabupaten Pemalang"),
-    ("B76", "Nama Saksi 2", "Sidin"),
-    ("B77", "TTL Saksi 2", "Pemalang,"),
-    ("B78", "NIK Saksi 2", "0000000000000000"),
-    ("B79", "Pekerjaan Saksi 2", ""),
-    ("B80", "Alamat Saksi 2", "")
-]
+# Fungsi Membaca Data Langsung dari Sheet ISIAN DATA (Mengambil Kolom B sebagai Label & Kolom G sebagai Isi)
+@st.cache_data(ttl=1)
+def load_excel_data():
+    try:
+        excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
+        sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
+        df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
+        
+        # Format Pemetaan Baris (Indeks Baris Excel - 1)
+        # Ambil Label di Kolom B (Index 1) & Nilai Isi di Kolom G (Index 6)
+        mapping_rows = [
+            ("Baris 2", "Nomor Register", 1),
+            ("Baris 3", "Tanggal Surat", 2),
+            ("Baris 4", "Tanggal Pelaksanaan", 3), # Mengambil dari Kolom G4
+            ("Baris 5", "Jam Pelaksanaan", 4),
+            ("Baris 6", "Tempat Akad Nikah", 5),
+            
+            # Catin Laki-Laki
+            ("Baris 8", "Nama Catin Laki-Laki", 7),
+            ("Baris 9", "Bin (Ayah Laki-Laki)", 8),
+            ("Baris 10", "TTL Catin Laki-Laki", 9),
+            ("Baris 11", "NIK Catin Laki-Laki", 10),
+            ("Baris 12", "Pekerjaan Laki-Laki", 11),
+            ("Baris 13", "Status Laki-Laki", 12),
+            ("Baris 14", "Jenis Kelamin Laki-Laki", 13),
+            ("Baris 15", "Nama Istri Terdahulu", 14),
+            ("Baris 16", "Alamat Catin Laki-Laki", 15),
+            ("Baris 17", "Pendidikan Laki-Laki", 16),
+            
+            # Ortu Laki-Laki
+            ("Baris 19", "Nama Ayah Laki-Laki", 18),
+            ("Baris 20", "NIK Ayah Laki-Laki", 19),
+            ("Baris 21", "TTL Ayah Laki-Laki", 20),
+            ("Baris 22", "Pekerjaan Ayah Laki-Laki", 21),
+            ("Baris 23", "Alamat Ayah Laki-Laki", 22),
+            ("Baris 26", "Nama Ibu Laki-Laki", 25),
+            ("Baris 27", "NIK Ibu Laki-Laki", 26),
+            ("Baris 28", "TTL Ibu Laki-Laki", 27),
+            ("Baris 29", "Pekerjaan Ibu Laki-Laki", 28),
+            ("Baris 30", "Alamat Ibu Laki-Laki", 29),
+            
+            # Catin Perempuan
+            ("Baris 34", "Nama Catin Perempuan", 33),
+            ("Baris 35", "Binti (Ayah Perempuan)", 34),
+            ("Baris 36", "TTL Catin Perempuan", 35),
+            ("Baris 37", "NIK Catin Perempuan", 36),
+            ("Baris 38", "Pekerjaan Perempuan", 37),
+            ("Baris 39", "Status Perempuan", 38),
+            ("Baris 40", "Jenis Kelamin Perempuan", 39),
+            ("Baris 41", "Alamat Catin Perempuan", 40),
+            ("Baris 42", "Nama Suami Terdahulu", 41),
+            ("Baris 43", "Pendidikan Perempuan", 42),
+            
+            # Ortu Perempuan
+            ("Baris 45", "Nama Ayah Perempuan", 44),
+            ("Baris 46", "NIK Ayah Perempuan", 45),
+            ("Baris 47", "TTL Ayah Perempuan", 46),
+            ("Baris 48", "Pekerjaan Ayah Perempuan", 47),
+            ("Baris 49", "Alamat Ayah Perempuan", 48),
+            ("Baris 52", "Nama Ibu Perempuan", 51),
+            ("Baris 53", "NIK Ibu Perempuan", 52),
+            ("Baris 54", "TTL Ibu Perempuan", 53),
+            ("Baris 55", "Pekerjaan Ibu Perempuan", 54),
+            ("Baris 56", "Alamat Ibu Perempuan", 55),
+            
+            # Wali & Saksi
+            ("Baris 58", "Nama Wali", 57),
+            ("Baris 59", "Bin Wali", 58),
+            ("Baris 60", "NIK Wali", 59),
+            ("Baris 61", "TTL Wali", 60),
+            ("Baris 62", "Pekerjaan Wali", 61),
+            ("Baris 63", "Alamat Wali", 62),
+            ("Baris 64", "Hubungan Wali", 63),
+            ("Baris 65", "Mahar / Maskawin", 64),
+            ("Baris 70", "Nama Saksi 1", 69),
+            ("Baris 71", "TTL Saksi 1", 70),
+            ("Baris 72", "NIK Saksi 1", 71),
+            ("Baris 73", "Pekerjaan Saksi 1", 72),
+            ("Baris 74", "Alamat Saksi 1", 73),
+            ("Baris 76", "Nama Saksi 2", 75),
+            ("Baris 77", "TTL Saksi 2", 76),
+            ("Baris 78", "NIK Saksi 2", 77),
+            ("Baris 79", "Pekerjaan Saksi 2", 78),
+            ("Baris 80", "Alamat Saksi 2", 79)
+        ]
+        
+        extracted_data = []
+        for ref, label, r_idx in mapping_rows:
+            val = ""
+            if r_idx < len(df):
+                # Ambil isi di Kolom G (index 6), jika kosong ambil Kolom F (index 5)
+                raw_val = df.iloc[r_idx, 6] if pd.notna(df.iloc[r_idx, 6]) else df.iloc[r_idx, 5]
+                val = str(raw_val) if pd.notna(raw_val) and str(raw_val).strip() != ":" else ""
+            extracted_data.append((ref, label, val))
+            
+        return extracted_data
+    except Exception as e:
+        st.error(f"Gagal membaca Excel: {e}")
+        return []
 
-# FORMULIR TERBAGI RAPI
-with st.form("form_isian_catin"):
-    st.subheader("Isikan Data Sesuai Urutan Kolom B Excel")
+data_list = load_excel_data()
+
+# FORM INPUT INTERAKTIF
+with st.form("form_catin"):
+    st.subheader("Isi / Sesuaikan Data Catin Secara Praktis")
     
-    tab_surat, tab_pria, tab_wanita, tab_wali_saksi = st.tabs([
+    t1, t2, t3, t4 = st.tabs([
         "📄 Register & Surat", 
-        "👨 Catin Laki-Laki & Ortu", 
-        "👩 Catin Perempuan & Ortu", 
+        "👨 Catin Laki-Laki", 
+        "👩 Catin Perempuan", 
         "🤝 Wali & Saksi"
     ])
-
+    
     user_inputs = {}
 
-    with tab_surat:
-        st.markdown("##### 1. Data Surat & Pelaksanaan Akad")
-        for cell_ref, label, def_val in FIELD_MAPPING[:5]:
-            user_inputs[label] = st.text_input(f"[{cell_ref}] {label}", value=def_val)
+    with t1:
+        st.markdown("##### Data Surat & Pelaksanaan Akad")
+        for ref, label, val in data_list[:5]:
+            user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
 
-    with tab_pria:
-        st.markdown("##### 2. Data Calon Pengantin Laki-Laki & Orang Tua")
+    with t2:
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**-- Data Catin Laki-Laki --**")
-            for cell_ref, label, def_val in FIELD_MAPPING[5:15]:
-                user_inputs[label] = st.text_input(f"[{cell_ref}] {label}", value=def_val)
+            st.markdown("##### -- Data Catin Laki-Laki --")
+            for ref, label, val in data_list[5:15]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
         with col2:
-            st.markdown("**-- Data Orang Tua Laki-Laki --**")
-            for cell_ref, label, def_val in FIELD_MAPPING[15:25]:
-                user_inputs[label] = st.text_input(f"[{cell_ref}] {label}", value=def_val)
+            st.markdown("##### -- Data Orang Tua Laki-Laki --")
+            for ref, label, val in data_list[15:25]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
 
-    with tab_wanita:
-        st.markdown("##### 3. Data Calon Pengantin Perempuan & Orang Tua")
+    with t3:
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**-- Data Catin Perempuan --**")
-            for cell_ref, label, def_val in FIELD_MAPPING[25:35]:
-                user_inputs[label] = st.text_input(f"[{cell_ref}] {label}", value=def_val)
+            st.markdown("##### -- Data Catin Perempuan --")
+            for ref, label, val in data_list[25:35]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
         with col2:
-            st.markdown("**-- Data Orang Tua Perempuan --**")
-            for cell_ref, label, def_val in FIELD_MAPPING[35:45]:
-                user_inputs[label] = st.text_input(f"[{cell_ref}] {label}", value=def_val)
+            st.markdown("##### -- Data Orang Tua Perempuan --")
+            for ref, label, val in data_list[35:45]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
 
-    with tab_wali_saksi:
-        st.markdown("##### 4. Data Wali, Saksi & Mahar")
+    with t4:
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**-- Data Wali & Mahar --**")
-            for cell_ref, label, def_val in FIELD_MAPPING[45:53]:
-                user_inputs[label] = st.text_input(f"[{cell_ref}] {label}", value=def_val)
+            st.markdown("##### -- Data Wali & Mahar --")
+            for ref, label, val in data_list[45:53]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
         with col2:
-            st.markdown("**-- Data Saksi 1 & Saksi 2 --**")
-            for cell_ref, label, def_val in FIELD_MAPPING[53:]:
-                user_inputs[label] = st.text_input(f"[{cell_ref}] {label}", value=def_val)
+            st.markdown("##### -- Data Saksi 1 & Saksi 2 --")
+            for ref, label, val in data_list[53:]:
+                user_inputs[label] = st.text_input(f"[{ref}] {label}", value=val)
 
     btn_simpan = st.form_submit_button("💾 Simpan & Perbarui Data Input", use_container_width=True)
 
 if btn_simpan:
     st.session_state['input_data'] = user_inputs
-    st.success("✅ Data berhasil disimpan! Anda bisa langsung mendownload hasilnya di bawah.")
+    st.success("✅ Data berhasil diperbarui!")
 
 # PANEL DOWNLOAD
 st.markdown("---")
-st.subheader("📥 Download Berkas")
+st.subheader("📥 Download Hasil")
 
 col_d1, col_d2 = st.columns(2)
 
@@ -182,9 +203,8 @@ with col_d2:
         title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=12, alignment=1, spaceAfter=10)
         elements.append(Paragraph("<b>RINGKASAN ISIAN DATA CATIN (F4)</b>", title_style))
         
-        # Susun tabel 2 kolom (Field, Value)
-        table_rows = [["FIELD (SELEKSI B2-B80)", "ISIAN DATA"]]
-        current_data = data_dict if data_dict else {item[1]: item[2] for item in FIELD_MAPPING}
+        table_rows = [["FIELD / BARIS EXCEL", "ISIAN DATA"]]
+        current_data = data_dict if data_dict else {item[1]: item[2] for item in data_list}
         for k, v in current_data.items():
             table_rows.append([str(k), str(v)])
             
