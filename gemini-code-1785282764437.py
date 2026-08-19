@@ -67,7 +67,6 @@ def load_excel_data():
             ("CATIN_L", "Baris 15", "Nama Istri Terdahulu", 14),
             ("CATIN_L", "Baris 16", "Alamat Catin Laki-Laki", 15),
             ("CATIN_L", "Baris 17", "Pendidikan Laki-Laki", 16),
-            ("CATIN_L", "Baris 18", "Umur Catin Laki-Laki", 17),
             
             # Group: ORTU PRIA
             ("ORTU_L", "Baris 19", "Nama Ayah Laki-Laki", 18),
@@ -92,7 +91,6 @@ def load_excel_data():
             ("CATIN_P", "Baris 41", "Alamat Catin Perempuan", 40),
             ("CATIN_P", "Baris 42", "Nama Suami Terdahulu", 41),
             ("CATIN_P", "Baris 43", "Pendidikan Perempuan", 42),
-            ("CATIN_P", "Baris 44", "Umur Catin Perempuan", 43),
             
             # Group: ORTU WANITA
             ("ORTU_P", "Baris 45", "Nama Ayah Perempuan", 44),
@@ -127,6 +125,25 @@ def load_excel_data():
             ("WALI_SAKSI", "Baris 80", "Alamat Saksi 2", 79)
         ]
         
+        # PENCARI NILAI UMUR DINAMIS DI SISI KOLOM EXCEL (Baris 9 -> Pria, Baris 35 -> Wanita)
+        umur_pria = ""
+        umur_wanita = ""
+        try:
+            # Baris 10 (Index 9) -> Catin Pria (Cek Kolom G, H, I, J, K)
+            for col_i in range(6, 12):
+                c_val = str(df.iloc[9, col_i]) if pd.notna(df.iloc[9, col_i]) else ""
+                if "TH" in c_val.upper() or "TAHUN" in c_val.upper() or (c_val.isdigit() and int(c_val) < 100):
+                    umur_pria = c_val.strip()
+                    break
+            # Baris 36 (Index 35) -> Catin Wanita
+            for col_i in range(6, 12):
+                c_val = str(df.iloc[35, col_i]) if pd.notna(df.iloc[35, col_i]) else ""
+                if "TH" in c_val.upper() or "TAHUN" in c_val.upper() or (c_val.isdigit() and int(c_val) < 100):
+                    umur_wanita = c_val.strip()
+                    break
+        except:
+            pass
+
         extracted_data = []
         for group, ref, label, r_idx in mapping_rows:
             val = ""
@@ -137,6 +154,10 @@ def load_excel_data():
                     val = ""
             extracted_data.append((group, ref, label, val))
             
+        # Sisipkan Umur Otomatis
+        extracted_data.append(("CATIN_L", "Baris 10", "Umur Catin Laki-Laki", umur_pria))
+        extracted_data.append(("CATIN_P", "Baris 36", "Umur Catin Perempuan", umur_wanita))
+
         return extracted_data
     except Exception as e:
         st.error(f"Gagal membaca Excel: {e}")
@@ -213,10 +234,9 @@ with col_d1:
     )
 
 with col_d2:
-    # FUNGSI PEMBUATAN PDF PORTRAIT F4 (BESAR, FULL 1 LEMBAR, TTD LENGKAP)
+    # FUNGSI PEMBUATAN PDF PORTRAIT F4 LENGKAP & PRESISI
     def generate_pdf_portrait_f4(data_dict):
         buffer = BytesIO()
-        # Ukuran F4 Portrait (612 x 936 point)
         F4_PORTRAIT = portrait((612, 936))
         
         doc = SimpleDocTemplate(
@@ -224,109 +244,110 @@ with col_d2:
             pagesize=F4_PORTRAIT, 
             rightMargin=25, 
             leftMargin=25, 
-            topMargin=20, 
-            bottomMargin=20
+            topMargin=15, 
+            bottomMargin=15
         )
         elements = []
         styles = getSampleStyleSheet()
         
-        # Style Teks Lebih Besar & Jelas
-        title_style = ParagraphStyle('T', fontSize=13, leading=15, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor("#0F2C59"))
-        sub_title = ParagraphStyle('ST', fontSize=9, leading=11, alignment=1, fontName='Helvetica-Oblique', textColor=colors.HexColor("#333333"))
+        title_style = ParagraphStyle('T', fontSize=12, leading=14, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor("#0F2C59"))
+        sub_title = ParagraphStyle('ST', fontSize=8.5, leading=10, alignment=1, fontName='Helvetica-Oblique', textColor=colors.HexColor("#333333"))
         
-        head_sec = ParagraphStyle('HS', fontSize=8.5, leading=10, fontName='Helvetica-Bold', textColor=colors.whitesmoke)
-        lbl_style = ParagraphStyle('L', fontSize=8, leading=9.5, fontName='Helvetica-Bold')
-        val_style = ParagraphStyle('V', fontSize=8, leading=9.5, fontName='Helvetica')
-        center_style = ParagraphStyle('CS', fontSize=8, leading=10, alignment=1, fontName='Helvetica')
-        center_bold = ParagraphStyle('CB', fontSize=8.5, leading=10.5, alignment=1, fontName='Helvetica-Bold')
+        head_sec = ParagraphStyle('HS', fontSize=8, leading=9, fontName='Helvetica-Bold', textColor=colors.whitesmoke)
+        lbl_style = ParagraphStyle('L', fontSize=7.5, leading=8.5, fontName='Helvetica-Bold')
+        val_style = ParagraphStyle('V', fontSize=7.5, leading=8.5, fontName='Helvetica')
+        center_style = ParagraphStyle('CS', fontSize=7.5, leading=9.5, alignment=1, fontName='Helvetica')
+        center_bold = ParagraphStyle('CB', fontSize=8, leading=10, alignment=1, fontName='Helvetica-Bold')
 
         # Header Dokumen
         elements.append(Paragraph("PEMERINTAH KABUPATEN PEMALANG", title_style))
         elements.append(Paragraph("BERKAS VERIFIKASI ISIAN DATA CATIN (FORM F4) - DESA TAMBI", sub_title))
-        elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 6))
         
         current_data = data_dict if data_dict else {item[2]: item[3] for item in data_list}
         def get_v(lbl):
             return str(current_data.get(lbl, "")).strip()
 
         # Format Umur
-        umur_l = get_v("Umur Catin Laki-Laki")
-        umur_p = get_v("Umur Catin Perempuan")
-        str_umur_l = f" ({umur_l} Thn)" if umur_l else ""
-        str_umur_p = f" ({umur_p} Thn)" if umur_p else ""
+        u_l = get_v("Umur Catin Laki-Laki")
+        u_p = get_v("Umur Catin Perempuan")
+        str_u_l = f" / {u_l}" if u_l else ""
+        str_u_p = f" / {u_p}" if u_p else ""
 
         # 1. TABLE REGIST & AKAD
         data_akad = [
             [Paragraph("<b>No. Register:</b> " + get_v("Nomor Register"), val_style), Paragraph("<b>Tgl Surat:</b> " + get_v("Tanggal Surat"), val_style)],
-            [Paragraph("<b>Tgl Pelaksanaan:</b> " + get_v("Tanggal Pelaksanaan"), val_style), Paragraph("<b>Jam / Tempat:</b> " + get_v("Jam Pelaksanaan") + " / " + get_v("Tempat Akad Nikah"), val_style)]
+            [Paragraph("<b>Tgl Pelaksanaan:</b> " + get_v("Tanggal Pelaksanaan"), val_style), Paragraph("<b>Jam / Tempat Akad:</b> " + get_v("Jam Pelaksanaan") + " / " + get_v("Tempat Akad Nikah"), val_style)]
         ]
         t_akad = Table(data_akad, colWidths=[281, 281])
         t_akad.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#EAEDED")),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#BDC3C7")),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('LEFTPADDING', (0,0), (-1,-1), 6),
+            ('TOPPADDING', (0,0), (-1,-1), 3),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+            ('LEFTPADDING', (0,0), (-1,-1), 5),
         ]))
         elements.append(t_akad)
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 5))
 
-        # FUNGSI PEMBUAT SECTION TABLE
         def make_section(title, rows_data):
             content = [[Paragraph(title, head_sec), ""]]
             for r in rows_data:
                 content.append([Paragraph(r[0], lbl_style), Paragraph(r[1], val_style)])
-            t = Table(content, colWidths=[150, 412])
+            t = Table(content, colWidths=[140, 422])
             t.setStyle(TableStyle([
                 ('SPAN', (0,0), (1,0)),
                 ('BACKGROUND', (0,0), (1,0), colors.HexColor("#1F4E78")),
                 ('GRID', (0,0), (-1,-1), 0.4, colors.HexColor("#D5D8DC")),
-                ('TOPPADDING', (0,0), (-1,-1), 3),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+                ('TOPPADDING', (0,0), (-1,-1), 2.5),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
                 ('LEFTPADDING', (0,0), (-1,-1), 5),
             ]))
             return t
 
         # 2. CATIN LAKI-LAKI
         t_pria = make_section("I. DATA CATIN LAKI-LAKI", [
-            ("Nama Lengkap & Bin", get_v("Nama Catin Laki-Laki") + " Bin " + get_v("Bin (Ayah Laki-Laki)")),
-            ("NIK / TTL / Umur", get_v("NIK Catin Laki-Laki") + " / " + get_v("TTL Catin Laki-Laki") + str_umur_l),
+            ("Nama Lengkap / Bin", get_v("Nama Catin Laki-Laki") + " Bin " + get_v("Bin (Ayah Laki-Laki)")),
+            ("NIK / TTL / Umur", get_v("NIK Catin Laki-Laki") + " / " + get_v("TTL Catin Laki-Laki") + str_u_l),
             ("Status / Pekerjaan", get_v("Status Laki-Laki") + " / " + get_v("Pekerjaan Laki-Laki")),
             ("Alamat", get_v("Alamat Catin Laki-Laki")),
-            ("Orang Tua (Ayah / Ibu)", get_v("Nama Ayah Laki-Laki") + " / " + get_v("Nama Ibu Laki-Laki"))
+            ("Ayah / NIK / TTL / Pekerjaan", get_v("Nama Ayah Laki-Laki") + " / " + get_v("NIK Ayah Laki-Laki") + " / " + get_v("TTL Ayah Laki-Laki") + " / " + get_v("Pekerjaan Ayah Laki-Laki")),
+            ("Ibu / NIK / TTL / Pekerjaan", get_v("Nama Ibu Laki-Laki") + " / " + get_v("NIK Ibu Laki-Laki") + " / " + get_v("TTL Ibu Laki-Laki") + " / " + get_v("Pekerjaan Ibu Laki-Laki"))
         ])
         elements.append(t_pria)
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 5))
 
         # 3. CATIN PEREMPUAN
         t_wanita = make_section("II. DATA CATIN PEREMPUAN", [
-            ("Nama Lengkap & Binti", get_v("Nama Catin Perempuan") + " Binti " + get_v("Binti (Ayah Perempuan)")),
-            ("NIK / TTL / Umur", get_v("NIK Catin Perempuan") + " / " + get_v("TTL Catin Perempuan") + str_umur_p),
+            ("Nama Lengkap / Binti", get_v("Nama Catin Perempuan") + " Binti " + get_v("Binti (Ayah Perempuan)")),
+            ("NIK / TTL / Umur", get_v("NIK Catin Perempuan") + " / " + get_v("TTL Catin Perempuan") + str_u_p),
             ("Status / Pekerjaan", get_v("Status Perempuan") + " / " + get_v("Pekerjaan Perempuan")),
             ("Alamat", get_v("Alamat Catin Perempuan")),
-            ("Orang Tua (Ayah / Ibu)", get_v("Nama Ayah Perempuan") + " / " + get_v("Nama Ibu Perempuan"))
+            ("Ayah / NIK / TTL / Pekerjaan", get_v("Nama Ayah Perempuan") + " / " + get_v("NIK Ayah Perempuan") + " / " + get_v("TTL Ayah Perempuan") + " / " + get_v("Pekerjaan Ayah Perempuan")),
+            ("Ibu / NIK / TTL / Pekerjaan", get_v("Nama Ibu Perempuan") + " / " + get_v("NIK Ibu Perempuan") + " / " + get_v("TTL Ibu Perempuan") + " / " + get_v("Pekerjaan Ibu Perempuan"))
         ])
         elements.append(t_wanita)
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 5))
 
-        # 4. WALI, MAHAR & SAKSI
-        t_wali = make_section("III. DATA WALI, MAHAR & SAKSI-SAKSI", [
-            ("Wali Nikah & Hubungan", get_v("Nama Wali") + " Bin " + get_v("Bin Wali") + f" ({get_v('Hubungan Wali')})"),
-            ("NIK / TTL / Pekerjaan Wali", get_v("NIK Wali") + " / " + get_v("TTL Wali") + " / " + get_v("Pekerjaan Wali")),
+        # 4. DATA WALI (DIJAMIN LENGKAP) & SAKSI
+        t_wali = make_section("III. DATA WALI NIKAH, MAHAR & SAKSI-SAKSI", [
+            ("Nama Wali / Bin", get_v("Nama Wali") + " Bin " + get_v("Bin Wali") + f" ({get_v('Hubungan Wali')})"),
+            ("NIK / TTL Wali", get_v("NIK Wali") + " / " + get_v("TTL Wali")),
+            ("Pekerjaan & Alamat Wali", get_v("Pekerjaan Wali") + " / " + get_v("Alamat Wali")),
             ("Mahar / Maskawin", get_v("Mahar / Maskawin")),
-            ("Saksi I", get_v("Nama Saksi 1") + " (NIK: " + get_v("NIK Saksi 1") + ")"),
-            ("Saksi II", get_v("Nama Saksi 2") + " (NIK: " + get_v("NIK Saksi 2") + ")")
+            ("Saksi I", get_v("Nama Saksi 1") + " / NIK: " + get_v("NIK Saksi 1") + " / Pekerjaan: " + get_v("Pekerjaan Saksi 1")),
+            ("Saksi II", get_v("Nama Saksi 2") + " / NIK: " + get_v("NIK Saksi 2") + " / Pekerjaan: " + get_v("Pekerjaan Saksi 2"))
         ])
         elements.append(t_wali)
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 12))
 
-        # 5. KOLOM TANDA TANGAN (PETUGAS & KEPALA DESA)
+        # 5. KOLOM TANDA TANGAN (POSISI DISESUAIKAN: KANAN = KASI PELAYANAN, KIRI = KADES)
         ttd_data = [
             [
                 Paragraph("Mengetahui,<br/><b>KEPALA DESA TAMBI</b>", center_style),
                 Paragraph("Desa Tambi, " + format_tanggal_indonesia(datetime.now().strftime("%Y-%m-%d")) + "<br/><b>KASI PELAYANAN DESA TAMBI</b>", center_style)
             ],
-            ["", ""],  # Ruang Tanda Tangan
+            ["", ""],  # Space TTD
             [
                 Paragraph("<b><u>JURI</u></b>", center_bold),
                 Paragraph("<b><u>CHALIM MUCHTAROM, S.Pd.I</u></b>", center_bold)
@@ -337,7 +358,7 @@ with col_d2:
         t_ttd.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0,1), (-1,1), 35), # Jarak tanda tangan
+            ('BOTTOMPADDING', (0,1), (-1,1), 30),
         ]))
         elements.append(t_ttd)
 
@@ -347,7 +368,7 @@ with col_d2:
 
     pdf_bytes = generate_pdf_portrait_f4(st.session_state.get('input_data'))
     st.download_button(
-        label="📄 Download Laporan PDF Portrait (1 Lembar F4 Presisi)",
+        label="📄 Download Laporan PDF Portrait (1 Lembar F4 Sesuai)",
         data=pdf_bytes,
         file_name="Isian_Data_Catin_Desa_Tambi_F4.pdf",
         mime="application/pdf",
