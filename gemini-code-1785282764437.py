@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 from io import BytesIO
+import openpyxl
 from reportlab.lib.pagesizes import portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -42,11 +43,8 @@ def format_tanggal_indonesia(val):
             return val_str
     return val_str
 
-# FUNGSI MENEVALUASI RUMUS UMUR SECARA AKURAT BERDASARKAN TAHUN BERJALAN
 def hitung_umur_otomatis(ttl_val, raw_excel_val=""):
     tahun_sekarang = datetime.now().year
-    
-    # 1. Ekstrak tahun dari TTL (misal: "Pemalang, 15-08-1989" -> 1989)
     if ttl_val:
         years = re.findall(r'\b(19\d\d|20\d\d)\b', str(ttl_val))
         if years:
@@ -54,16 +52,86 @@ def hitung_umur_otomatis(ttl_val, raw_excel_val=""):
             umur_kalkulasi = tahun_sekarang - tahun_lahir
             if 10 <= umur_kalkulasi <= 100:
                 return f"{umur_kalkulasi} TAHUN"
-
-    # 2. Jika ada nilai mentah di Excel dan valid (>10 tahun), gunakan nilai tersebut
     if raw_excel_val:
         digits = re.sub(r'[^0-9]', '', str(raw_excel_val))
         if digits.isdigit():
             u_num = int(digits)
             if u_num >= 10:
                 return f"{u_num} TAHUN"
-
     return ""
+
+# MAPPING UTAMA
+MAPPING_ROWS = [
+    # Group, Ref, Label, Row_Index (0-based)
+    ("SURAT", "Baris 2", "Nomor Register", 1),
+    ("SURAT", "Baris 3", "Tanggal Surat", 2),
+    ("SURAT", "Baris 4", "Tanggal Pelaksanaan", 3),
+    ("SURAT", "Baris 5", "Jam Pelaksanaan", 4),
+    ("SURAT", "Baris 6", "Tempat Akad Nikah", 5),
+    
+    ("CATIN_L", "Baris 8", "Nama Catin Laki-Laki", 7),
+    ("CATIN_L", "Baris 9", "Bin (Ayah Laki-Laki)", 8),
+    ("CATIN_L", "Baris 10", "TTL Catin Laki-Laki", 9),
+    ("CATIN_L", "Baris 11", "NIK Catin Laki-Laki", 10),
+    ("CATIN_L", "Baris 12", "Pekerjaan Laki-Laki", 11),
+    ("CATIN_L", "Baris 13", "Status Laki-Laki", 12),
+    ("CATIN_L", "Baris 14", "Jenis Kelamin Laki-Laki", 13),
+    ("CATIN_L", "Baris 15", "Nama Istri Terdahulu", 14),
+    ("CATIN_L", "Baris 16", "Alamat Catin Laki-Laki", 15),
+    ("CATIN_L", "Baris 17", "Pendidikan Laki-Laki", 16),
+    
+    ("ORTU_L", "Baris 19", "Nama Ayah Laki-Laki", 18),
+    ("ORTU_L", "Baris 20", "NIK Ayah Laki-Laki", 19),
+    ("ORTU_L", "Baris 21", "TTL Ayah Laki-Laki", 20),
+    ("ORTU_L", "Baris 22", "Pekerjaan Ayah Laki-Laki", 21),
+    ("ORTU_L", "Baris 23", "Alamat Ayah Laki-Laki", 22),
+    ("ORTU_L", "Baris 26", "Nama Ibu Laki-Laki", 25),
+    ("ORTU_L", "Baris 27", "NIK Ibu Laki-Laki", 26),
+    ("ORTU_L", "Baris 28", "TTL Ibu Laki-Laki", 27),
+    ("ORTU_L", "Baris 29", "Pekerjaan Ibu Laki-Laki", 28),
+    ("ORTU_L", "Baris 30", "Alamat Ibu Laki-Laki", 29),
+    
+    ("CATIN_P", "Baris 34", "Nama Catin Perempuan", 33),
+    ("CATIN_P", "Baris 35", "Binti (Ayah Perempuan)", 34),
+    ("CATIN_P", "Baris 36", "TTL Catin Perempuan", 35),
+    ("CATIN_P", "Baris 37", "NIK Catin Perempuan", 36),
+    ("CATIN_P", "Baris 38", "Pekerjaan Perempuan", 37),
+    ("CATIN_P", "Baris 39", "Status Perempuan", 38),
+    ("CATIN_P", "Baris 40", "Jenis Kelamin Perempuan", 39),
+    ("CATIN_P", "Baris 41", "Alamat Catin Perempuan", 40),
+    ("CATIN_P", "Baris 42", "Nama Suami Terdahulu", 41),
+    ("CATIN_P", "Baris 43", "Pendidikan Perempuan", 42),
+    
+    ("ORTU_P", "Baris 45", "Nama Ayah Perempuan", 44),
+    ("ORTU_P", "Baris 46", "NIK Ayah Perempuan", 45),
+    ("ORTU_P", "Baris 47", "TTL Ayah Perempuan", 46),
+    ("ORTU_P", "Baris 48", "Pekerjaan Ayah Perempuan", 47),
+    ("ORTU_P", "Baris 49", "Alamat Ayah Perempuan", 48),
+    ("ORTU_P", "Baris 52", "Nama Ibu Perempuan", 51),
+    ("ORTU_P", "Baris 53", "NIK Ibu Perempuan", 52),
+    ("ORTU_P", "Baris 54", "TTL Ibu Perempuan", 53),
+    ("ORTU_P", "Baris 55", "Pekerjaan Ibu Perempuan", 54),
+    ("ORTU_P", "Baris 56", "Alamat Ibu Perempuan", 55),
+    
+    ("WALI_SAKSI", "Baris 58", "Nama Wali", 57),
+    ("WALI_SAKSI", "Baris 59", "Bin Wali", 58),
+    ("WALI_SAKSI", "Baris 60", "NIK Wali", 59),
+    ("WALI_SAKSI", "Baris 61", "TTL Wali", 60),
+    ("WALI_SAKSI", "Baris 62", "Pekerjaan Wali", 61),
+    ("WALI_SAKSI", "Baris 63", "Alamat Wali", 62),
+    ("WALI_SAKSI", "Baris 64", "Hubungan Wali", 63),
+    ("WALI_SAKSI", "Baris 65", "Mahar / Maskawin", 64),
+    ("WALI_SAKSI", "Baris 70", "Nama Saksi 1", 69),
+    ("WALI_SAKSI", "Baris 71", "TTL Saksi 1", 70),
+    ("WALI_SAKSI", "Baris 72", "NIK Saksi 1", 71),
+    ("WALI_SAKSI", "Baris 73", "Pekerjaan Saksi 1", 72),
+    ("WALI_SAKSI", "Baris 74", "Alamat Saksi 1", 73),
+    ("WALI_SAKSI", "Baris 76", "Nama Saksi 2", 75),
+    ("WALI_SAKSI", "Baris 77", "TTL Saksi 2", 76),
+    ("WALI_SAKSI", "Baris 78", "NIK Saksi 2", 77),
+    ("WALI_SAKSI", "Baris 79", "Pekerjaan Saksi 2", 78),
+    ("WALI_SAKSI", "Baris 80", "Alamat Saksi 2", 79)
+]
 
 @st.cache_data(ttl=1)
 def load_excel_data():
@@ -72,104 +140,16 @@ def load_excel_data():
         sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
         df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
         
-        mapping_rows = [
-            # Group: SURAT & AKAD
-            ("SURAT", "Baris 2", "Nomor Register", 1),
-            ("SURAT", "Baris 3", "Tanggal Surat", 2),
-            ("SURAT", "Baris 4", "Tanggal Pelaksanaan", 3),
-            ("SURAT", "Baris 5", "Jam Pelaksanaan", 4),
-            ("SURAT", "Baris 6", "Tempat Akad Nikah", 5),
-            
-            # Group: CATIN PRIA
-            ("CATIN_L", "Baris 8", "Nama Catin Laki-Laki", 7),
-            ("CATIN_L", "Baris 9", "Bin (Ayah Laki-Laki)", 8),
-            ("CATIN_L", "Baris 10", "TTL Catin Laki-Laki", 9),
-            ("CATIN_L", "Baris 11", "NIK Catin Laki-Laki", 10),
-            ("CATIN_L", "Baris 12", "Pekerjaan Laki-Laki", 11),
-            ("CATIN_L", "Baris 13", "Status Laki-Laki", 12),
-            ("CATIN_L", "Baris 14", "Jenis Kelamin Laki-Laki", 13),
-            ("CATIN_L", "Baris 15", "Nama Istri Terdahulu", 14),
-            ("CATIN_L", "Baris 16", "Alamat Catin Laki-Laki", 15),
-            ("CATIN_L", "Baris 17", "Pendidikan Laki-Laki", 16),
-            
-            # Group: ORTU PRIA
-            ("ORTU_L", "Baris 19", "Nama Ayah Laki-Laki", 18),
-            ("ORTU_L", "Baris 20", "NIK Ayah Laki-Laki", 19),
-            ("ORTU_L", "Baris 21", "TTL Ayah Laki-Laki", 20),
-            ("ORTU_L", "Baris 22", "Pekerjaan Ayah Laki-Laki", 21),
-            ("ORTU_L", "Baris 23", "Alamat Ayah Laki-Laki", 22),
-            ("ORTU_L", "Baris 26", "Nama Ibu Laki-Laki", 25),
-            ("ORTU_L", "Baris 27", "NIK Ibu Laki-Laki", 26),
-            ("ORTU_L", "Baris 28", "TTL Ibu Laki-Laki", 27),
-            ("ORTU_L", "Baris 29", "Pekerjaan Ibu Laki-Laki", 28),
-            ("ORTU_L", "Baris 30", "Alamat Ibu Laki-Laki", 29),
-            
-            # Group: CATIN WANITA
-            ("CATIN_P", "Baris 34", "Nama Catin Perempuan", 33),
-            ("CATIN_P", "Baris 35", "Binti (Ayah Perempuan)", 34),
-            ("CATIN_P", "Baris 36", "TTL Catin Perempuan", 35),
-            ("CATIN_P", "Baris 37", "NIK Catin Perempuan", 36),
-            ("CATIN_P", "Baris 38", "Pekerjaan Perempuan", 37),
-            ("CATIN_P", "Baris 39", "Status Perempuan", 38),
-            ("CATIN_P", "Baris 40", "Jenis Kelamin Perempuan", 39),
-            ("CATIN_P", "Baris 41", "Alamat Catin Perempuan", 40),
-            ("CATIN_P", "Baris 42", "Nama Suami Terdahulu", 41),
-            ("CATIN_P", "Baris 43", "Pendidikan Perempuan", 42),
-            
-            # Group: ORTU WANITA
-            ("ORTU_P", "Baris 45", "Nama Ayah Perempuan", 44),
-            ("ORTU_P", "Baris 46", "NIK Ayah Perempuan", 45),
-            ("ORTU_P", "Baris 47", "TTL Ayah Perempuan", 46),
-            ("ORTU_P", "Baris 48", "Pekerjaan Ayah Perempuan", 47),
-            ("ORTU_P", "Baris 49", "Alamat Ayah Perempuan", 48),
-            ("ORTU_P", "Baris 52", "Nama Ibu Perempuan", 51),
-            ("ORTU_P", "Baris 53", "NIK Ibu Perempuan", 52),
-            ("ORTU_P", "Baris 54", "TTL Ibu Perempuan", 53),
-            ("ORTU_P", "Baris 55", "Pekerjaan Ibu Perempuan", 54),
-            ("ORTU_P", "Baris 56", "Alamat Ibu Perempuan", 55),
-            
-            # Group: WALI & SAKSI
-            ("WALI_SAKSI", "Baris 58", "Nama Wali", 57),
-            ("WALI_SAKSI", "Baris 59", "Bin Wali", 58),
-            ("WALI_SAKSI", "Baris 60", "NIK Wali", 59),
-            ("WALI_SAKSI", "Baris 61", "TTL Wali", 60),
-            ("WALI_SAKSI", "Baris 62", "Pekerjaan Wali", 61),
-            ("WALI_SAKSI", "Baris 63", "Alamat Wali", 62),
-            ("WALI_SAKSI", "Baris 64", "Hubungan Wali", 63),
-            ("WALI_SAKSI", "Baris 65", "Mahar / Maskawin", 64),
-            ("WALI_SAKSI", "Baris 70", "Nama Saksi 1", 69),
-            ("WALI_SAKSI", "Baris 71", "TTL Saksi 1", 70),
-            ("WALI_SAKSI", "Baris 72", "NIK Saksi 1", 71),
-            ("WALI_SAKSI", "Baris 73", "Pekerjaan Saksi 1", 72),
-            ("WALI_SAKSI", "Baris 74", "Alamat Saksi 1", 73),
-            ("WALI_SAKSI", "Baris 76", "Nama Saksi 2", 75),
-            ("WALI_SAKSI", "Baris 77", "TTL Saksi 2", 76),
-            ("WALI_SAKSI", "Baris 78", "NIK Saksi 2", 77),
-            ("WALI_SAKSI", "Baris 79", "Pekerjaan Saksi 2", 78),
-            ("WALI_SAKSI", "Baris 80", "Alamat Saksi 2", 79)
-        ]
-
         extracted_data = []
         ttl_l, ttl_p = "", ""
         raw_u_l, raw_u_p = "", ""
 
-        try:
-            for col_idx in range(6, df.shape[1]):
-                val_l = df.iloc[9, col_idx] if pd.notna(df.iloc[9, col_idx]) else ""
-                val_p = df.iloc[35, col_idx] if pd.notna(df.iloc[35, col_idx]) else ""
-                if not raw_u_l and ("TH" in str(val_l).upper() or str(val_l).isdigit()):
-                    raw_u_l = str(val_l)
-                if not raw_u_p and ("TH" in str(val_p).upper() or str(val_p).isdigit()):
-                    raw_u_p = str(val_p)
-        except:
-            pass
-
-        for group, ref, label, r_idx in mapping_rows:
+        for group, ref, label, r_idx in MAPPING_ROWS:
             val = ""
             if r_idx < len(df):
                 raw_val = df.iloc[r_idx, 6] if pd.notna(df.iloc[r_idx, 6]) else df.iloc[r_idx, 5]
                 val = format_tanggal_indonesia(raw_val)
-                if val.strip() == ":":
+                if str(val).strip() == ":":
                     val = ""
             
             if label == "TTL Catin Laki-Laki":
@@ -241,9 +221,9 @@ with st.form("form_catin"):
 
 if btn_simpan:
     st.session_state['input_data'] = user_inputs
-    st.success("✅ Data berhasil diperbarui!")
+    st.success("✅ Data berhasil disimpan! Silakan download file Excel atau PDF terbaru di bawah.")
 
-# MENGAMBIL ISI DATA TERKINI
+# DATA SAAT INI
 data_saat_ini = st.session_state.get('input_data', {item[2]: item[3] for item in data_list})
 
 def bersihkan_nama_file(teks):
@@ -254,36 +234,54 @@ def bersihkan_nama_file(teks):
 nama_catin_l = data_saat_ini.get("Nama Catin Laki-Laki", "").strip()
 nama_catin_p = data_saat_ini.get("Nama Catin Perempuan", "").strip()
 
-# PEMBENTUKAN NAMA FILE EXCEL OTOMATIS BERDASARKAN NAMA CATIN
 if nama_catin_l and nama_catin_p:
-    excel_download_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_l)}_&_{bersihkan_nama_file(nama_catin_p)}.xlsb"
+    base_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_l)}_&_{bersihkan_nama_file(nama_catin_p)}"
 elif nama_catin_l:
-    excel_download_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_l)}.xlsb"
+    base_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_l)}"
 elif nama_catin_p:
-    excel_download_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_p)}.xlsb"
+    base_name = f"BERKAS_CATIN_F4_{bersihkan_nama_file(nama_catin_p)}"
 else:
-    excel_download_name = "BERKAS_CATIN_F4_TERUPDATE.xlsb"
+    base_name = "BERKAS_CATIN_F4_TERUPDATE"
 
-# PEMBENTUKAN NAMA FILE PDF OTOMATIS BERDASARKAN NAMA CATIN
-if nama_catin_l and nama_catin_p:
-    pdf_download_name = f"Isian_Data_Catin_{bersihkan_nama_file(nama_catin_l)}_&_{bersihkan_nama_file(nama_catin_p)}.pdf"
-else:
-    pdf_download_name = "Isian_Data_Catin_Desa_Tambi_F4.pdf"
+excel_download_name = f"{base_name}.xlsx"
+pdf_download_name = f"{base_name}.pdf"
+
+# FUNGSI MEMBENTUK FILE EXCEL TERUBAH 100% AMPUH
+def generate_updated_excel(current_data):
+    # Read xlsb -> write to new openpyxl Workbook
+    excel_file = pd.ExcelFile(FILE_NAME, engine='pyxlsb')
+    sheet_name = next((s for s in excel_file.sheet_names if s.strip().upper() == "ISIAN DATA"), excel_file.sheet_names[0])
+    df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, engine='pyxlsb', header=None)
+    
+    # Update dataframe sesuai data input user
+    for group, ref, label, r_idx in MAPPING_ROWS:
+        if label in current_data:
+            val_baru = current_data[label]
+            # Masukkan ke kolom F (index 5) / G (index 6)
+            if df.shape[1] > 6:
+                df.iloc[r_idx, 6] = val_baru
+            else:
+                df.iloc[r_idx, 5] = val_baru
+                
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name="ISIAN DATA", index=False, header=False)
+    output.seek(0)
+    return output
 
 # PANEL DOWNLOAD RESULT
 st.markdown("---")
-st.subheader("📥 Download Hasil")
+st.subheader("📥 Download Hasil Terbaru")
 
 col_d1, col_d2 = st.columns(2)
 
 with col_d1:
-    with open(FILE_NAME, "rb") as f:
-        file_bytes = f.read()
+    excel_bytes = generate_updated_excel(data_saat_ini)
     st.download_button(
-        label=f"📥 Download Excel: {excel_download_name}",
-        data=file_bytes,
+        label=f"📥 Download Excel (.xlsx): {excel_download_name}",
+        data=excel_bytes,
         file_name=excel_download_name,
-        mime="application/vnd.ms-excel.sheet.binary.macroenabled.12",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
 
