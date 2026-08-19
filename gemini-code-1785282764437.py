@@ -4,7 +4,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 from io import BytesIO
 from reportlab.lib.pagesizes import landscape
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
@@ -23,32 +23,24 @@ NAMA_BULAN = [
     "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
 ]
 
-# Fungsi Pintar untuk Mempertahankan / Mengonversi Format Tanggal Teks Bulan Indonesia
 def format_tanggal_indonesia(val):
     if pd.isna(val) or val is None:
         return ""
-    
-    # Jika angka serial Excel (misal 46273)
     if isinstance(val, (int, float)):
         try:
             date_obj = datetime(1899, 12, 30) + timedelta(days=int(val))
             return f"{date_obj.day} {NAMA_BULAN[date_obj.month]} {date_obj.year}"
         except:
             return str(val)
-            
     val_str = str(val).strip()
-    
-    # Jika angka murni berupa string (misal "46273")
     if val_str.isdigit() and len(val_str) >= 5:
         try:
             date_obj = datetime(1899, 12, 30) + timedelta(days=int(val_str))
             return f"{date_obj.day} {NAMA_BULAN[date_obj.month]} {date_obj.year}"
         except:
             return val_str
-            
     return val_str
 
-# Fungsi Membaca Data dari Sheet ISIAN DATA
 @st.cache_data(ttl=1)
 def load_excel_data():
     try:
@@ -224,40 +216,105 @@ with col_d1:
     )
 
 with col_d2:
-    def generate_pdf(data_dict):
+    # FUNGSI PEMBUATAN PDF FORMAL 1 LEMBAR UKURAN F4 (LANDSCAPE)
+    def generate_pdf_formal(data_dict):
         buffer = BytesIO()
-        F4_SIZE = landscape((612, 936))
-        doc = SimpleDocTemplate(buffer, pagesize=F4_SIZE, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+        # Ukuran F4 Landscape dalam Point (8.5 x 13 Inci)
+        F4_LANDSCAPE = landscape((612, 936))
+        
+        # Margin hemat tempat agar pas 1 halaman
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=F4_LANDSCAPE, 
+            rightMargin=15, 
+            leftMargin=15, 
+            topMargin=15, 
+            bottomMargin=15
+        )
         elements = []
         styles = getSampleStyleSheet()
         
-        title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=12, alignment=1, spaceAfter=10)
-        elements.append(Paragraph("<b>RINGKASAN ISIAN DATA CATIN (F4)</b>", title_style))
+        # Style Header
+        header_style = ParagraphStyle(
+            'HeaderStyle',
+            parent=styles['Heading1'],
+            fontSize=11,
+            leading=13,
+            alignment=1,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor("#0F2C59")
+        )
         
-        table_rows = [["FIELD / BARIS EXCEL", "ISIAN DATA"]]
+        sub_header_style = ParagraphStyle(
+            'SubHeaderStyle',
+            parent=styles['Normal'],
+            fontSize=8,
+            leading=10,
+            alignment=1,
+            fontName='Helvetica-Oblique',
+            textColor=colors.HexColor("#333333")
+        )
+        
+        cell_bold = ParagraphStyle('CB', fontSize=6.5, leading=7.5, fontName='Helvetica-Bold')
+        cell_norm = ParagraphStyle('CN', fontSize=6.5, leading=7.5, fontName='Helvetica')
+        
+        # Judul Dokumen
+        elements.append(Paragraph("RINGKASAN ISIAN DATA BERKAS CATIN (F4)", header_style))
+        elements.append(Paragraph("Daftar Pemeriksaan & Verifikasi Data Pernikahan", sub_header_style))
+        elements.append(Spacer(1, 6))
+        
+        # Menyiapkan Data Pasangan Kolom (4 Kolom Layout: Field1, Isi1, Field2, Isi2)
         current_data = data_dict if data_dict else {item[1]: item[2] for item in data_list}
-        for k, v in current_data.items():
-            table_rows.append([str(k), str(v)])
+        items = list(current_data.items())
+        
+        table_rows = [
+            [
+                Paragraph("<b>FIELD / PARAMETER (A)</b>", cell_bold),
+                Paragraph("<b>ISIAN DATA (A)</b>", cell_bold),
+                Paragraph("<b>FIELD / PARAMETER (B)</b>", cell_bold),
+                Paragraph("<b>ISIAN DATA (B)</b>", cell_bold)
+            ]
+        ]
+        
+        half = (len(items) + 1) // 2
+        for i in range(half):
+            k1, v1 = items[i]
+            k2, v2 = items[i + half] if (i + half) < len(items) else ("", "")
             
-        pdf_table = Table(table_rows, colWidths=[250, 600])
+            table_rows.append([
+                Paragraph(f"<b>{k1}</b>", cell_bold),
+                Paragraph(str(v1), cell_norm),
+                Paragraph(f"<b>{k2}</b>" if k2 else "", cell_bold),
+                Paragraph(str(v2) if v2 else "", cell_norm)
+            ])
+            
+        # Lebar Kolom Total = 906 pt (Muat di Kertas F4 936 pt)
+        col_widths = [160, 293, 160, 293]
+        
+        pdf_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
         pdf_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#0F2C59")),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('TOPPADDING', (0, 0), (-1, -1), 1.8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1.8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor("#CCCCCC")),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F9F9F9")]),
         ]))
+        
         elements.append(pdf_table)
         doc.build(elements)
         buffer.seek(0)
         return buffer
 
-    pdf_bytes = generate_pdf(st.session_state.get('input_data'))
+    pdf_bytes = generate_pdf_formal(st.session_state.get('input_data'))
     st.download_button(
-        label="📄 Download Laporan PDF (Ukuran F4)",
+        label="📄 Download Laporan PDF Formal (1 Lembar F4)",
         data=pdf_bytes,
-        file_name="Isian_Data_Catin_F4.pdf",
+        file_name="Isian_Data_Catin_F4_Formal.pdf",
         mime="application/pdf",
         use_container_width=True
     )
