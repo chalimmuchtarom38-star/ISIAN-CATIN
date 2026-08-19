@@ -1,9 +1,9 @@
 import os
+import re
 import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 from io import BytesIO
-import re
 from reportlab.lib.pagesizes import portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -42,27 +42,29 @@ def format_tanggal_indonesia(val):
             return val_str
     return val_str
 
-# FUNGSI BACKUP UNTUK MEMASTIKAN UMUR TEPAT JIKA RUMUS EXEL BELUM TER-UPDATE/RECALCULATE
-def dapatkan_umur_presisi(ttl_str, umur_raw_excel=""):
-    # Prioritaskan jika nilai dari Excel sudah benar (>10 tahun)
-    if umur_raw_excel:
-        clean_u = re.sub(r'[^0-9]', '', str(umur_raw_excel))
-        if clean_u.isdigit() and int(clean_u) >= 10:
-            return f"{clean_u} TAHUN"
-            
-    # Jika hasil pembacaan formula Excel lama/statis (misal 27), kalkulasikan otomatis berdasarkan tahun lahir
-    if ttl_str:
-        try:
-            tahun_sekarang = datetime.now().year
-            years = re.findall(r'\b(19\d\d|20\d\d)\b', str(ttl_str))
-            if years:
-                tahun_lahir = int(years[-1])
-                umur = tahun_sekarang - tahun_lahir
-                if 10 <= umur <= 100:
-                    return f"{umur} TAHUN"
-        except:
-            pass
-    return str(umur_raw_excel) if umur_raw_excel else ""
+# FUNGSI MENEVALUASI RUMUS UMUR SECARA AKURAT BERDASARKAN TAHUN BERJALAN
+def hitung_umur_otomatis(ttl_val, raw_excel_val=""):
+    tahun_sekarang = datetime.now().year
+    
+    # 1. Ekstrak tahun dari TTL (misal: "Pemalang, 15-08-1989" -> 1989)
+    if ttl_val:
+        years = re.findall(r'\b(19\d\d|20\d\d)\b', str(ttl_val))
+        if years:
+            tahun_lahir = int(years[-1])
+            umur_kalkulasi = tahun_sekarang - tahun_lahir
+            if 10 <= umur_kalkulasi <= 100:
+                return f"{umur_kalkulasi} TAHUN"
+
+    # 2. Jika ada nilai mentah di Excel dan valid (>10 tahun), gunakan nilai tersebut
+    if raw_excel_val:
+        digits = re.sub(r'[^0-9]', '', str(raw_excel_val))
+        if digits.isdigit():
+            u_num = int(digits)
+            # Koreksi jika angka simpanan lama (cached) di xlsb masih 27 tapi lahir 1989
+            if u_num >= 10:
+                return f"{u_num} TAHUN"
+
+    return ""
 
 @st.cache_data(ttl=1)
 def load_excel_data():
@@ -152,10 +154,15 @@ def load_excel_data():
         ttl_l, ttl_p = "", ""
         raw_u_l, raw_u_p = "", ""
 
-        # Ambil nilai mentah dari Excel
+        # Membaca kolom samping umur jika ada di Excel
         try:
-            raw_u_l = df.iloc[9, 10] if df.shape[1] > 10 and pd.notna(df.iloc[9, 10]) else ""
-            raw_u_p = df.iloc[35, 10] if df.shape[1] > 10 and pd.notna(df.iloc[35, 10]) else ""
+            for col_idx in range(6, df.shape[1]):
+                val_l = df.iloc[9, col_idx] if pd.notna(df.iloc[9, col_idx]) else ""
+                val_p = df.iloc[35, col_idx] if pd.notna(df.iloc[35, col_idx]) else ""
+                if not raw_u_l and ("TH" in str(val_l).upper() or str(val_l).isdigit()):
+                    raw_u_l = str(val_l)
+                if not raw_u_p and ("TH" in str(val_p).upper() or str(val_p).isdigit()):
+                    raw_u_p = str(val_p)
         except:
             pass
 
@@ -174,9 +181,12 @@ def load_excel_data():
                 
             extracted_data.append((group, ref, label, val))
             
-        # Penyesuaian Umur Presisi
-        extracted_data.append(("CATIN_L", "Baris 10", "Umur Catin Laki-Laki", dapatkan_umur_presisi(ttl_l, raw_u_l)))
-        extracted_data.append(("CATIN_P", "Baris 36", "Umur Catin Perempuan", dapatkan_umur_presisi(ttl_p, raw_u_p)))
+        # Sisipkan Umur Otomatis Hasil Kalkulasi Rumus Presisi
+        umur_l_final = hitung_umur_otomatis(ttl_l, raw_u_l)
+        umur_p_final = hitung_umur_otomatis(ttl_p, raw_u_p)
+
+        extracted_data.append(("CATIN_L", "Baris 10", "Umur Catin Laki-Laki", umur_l_final))
+        extracted_data.append(("CATIN_P", "Baris 36", "Umur Catin Perempuan", umur_p_final))
 
         return extracted_data
     except Exception as e:
@@ -287,9 +297,9 @@ with col_d2:
         def get_v(lbl):
             return str(current_data.get(lbl, "")).strip()
 
-        # Format Umur
-        u_l = get_v("Umur Catin Laki-Laki")
-        u_p = get_v("Umur Catin Perempuan")
+        # Format Umur Dinamis & Presisi
+        u_l = get_v("Umur Catin Laki-Laki") or hitung_umur_otomatis(get_v("TTL Catin Laki-Laki"))
+        u_p = get_v("Umur Catin Perempuan") or hitung_umur_otomatis(get_v("TTL Catin Perempuan"))
         str_u_l = f" / {u_l}" if u_l else ""
         str_u_p = f" / {u_p}" if u_p else ""
 
@@ -360,7 +370,7 @@ with col_d2:
         elements.append(t_wali)
         elements.append(Spacer(1, 12))
 
-        # 5. KOLOM TANDA TANGAN
+        # 5. KOLOM TANDA TANGAN (KASI PELAYANAN DI KANAN, KADES DI KIRI)
         ttd_data = [
             [
                 Paragraph("Mengetahui,<br/><b>KEPALA DESA TAMBI</b>", center_style),
