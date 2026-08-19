@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta, date
 from io import BytesIO
-from reportlab.lib.pagesizes import landscape
+from reportlab.lib.pagesizes import portrait
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -40,7 +40,6 @@ def parse_to_date_object(val):
             return date.today()
     
     val_str = str(val).strip()
-    # Cek jika format serial number excel dalam string
     if val_str.isdigit() and len(val_str) >= 5:
         try:
             dt = datetime(1899, 12, 30) + timedelta(days=int(val_str))
@@ -48,7 +47,6 @@ def parse_to_date_object(val):
         except:
             pass
             
-    # Parsing umum YYYY-MM-DD / DD-MM-YYYY
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
         try:
             return datetime.strptime(val_str, fmt).date()
@@ -168,7 +166,6 @@ def load_excel_data():
             if val is None:
                 val = ws.cell(row=r_idx, column=6).value
             
-            # Jika bukan field tanggal, format ke string tanggal Indonesia
             if label not in ["Tanggal Surat", "Tanggal Pelaksanaan"]:
                 val = format_tanggal_indonesia(val)
                 if str(val).strip() == ":":
@@ -199,7 +196,6 @@ with st.form("form_catin"):
         st.markdown("##### Data Surat & Pelaksanaan Akad")
         for ref, label, val, row_num in data_list[:5]:
             if label in ["Tanggal Surat", "Tanggal Pelaksanaan"]:
-                # Menggunakan Date Picker (Kalender) untuk pemilihan tanggal yang presisi
                 default_dt = parse_to_date_object(val)
                 d_selected = st.date_input(
                     f"[{ref}] {label}", 
@@ -299,15 +295,16 @@ with col_d1:
     )
 
 with col_d2:
+    # FUNGSI PDF DIPERBARUI: FORMAT PORTRAIT F4 FULL 1 LEMBAR DENGAN BLOK TANDA TANGAN KASI & KEPALA DESA TAMBI
     def generate_pdf_formal(data_dict):
         buffer = BytesIO()
-        F4_LANDSCAPE = landscape((612, 936))
+        F4_PORTRAIT = portrait((612, 936))
         
         doc = SimpleDocTemplate(
             buffer, 
-            pagesize=F4_LANDSCAPE, 
-            rightMargin=15, 
-            leftMargin=15, 
+            pagesize=F4_PORTRAIT, 
+            rightMargin=20, 
+            leftMargin=20, 
             topMargin=15, 
             bottomMargin=15
         )
@@ -338,9 +335,13 @@ with col_d2:
         cell_bold = ParagraphStyle('CB', fontSize=6.5, leading=7.5, fontName='Helvetica-Bold')
         cell_norm = ParagraphStyle('CN', fontSize=6.5, leading=7.5, fontName='Helvetica')
         
+        # Style Tanda Tangan
+        ttd_center = ParagraphStyle('TTDCenter', fontSize=7.5, leading=9, alignment=1, fontName='Helvetica')
+        ttd_bold_underline = ParagraphStyle('TTDBold', fontSize=8, leading=10, alignment=1, fontName='Helvetica-Bold')
+
         elements.append(Paragraph("RINGKASAN ISIAN DATA BERKAS CATIN (F4)", header_style))
         elements.append(Paragraph("Daftar Pemeriksaan & Verifikasi Data Pernikahan Terkelompok", sub_header_style))
-        elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 4))
         
         current_data = data_dict if data_dict else {
             item[1]: format_tanggal_indonesia(item[2]) if item[1] in ["Tanggal Surat", "Tanggal Pelaksanaan"] else item[2] 
@@ -378,56 +379,25 @@ with col_d2:
 
         table_rows = [
             [
-                Paragraph("<b>FIELD / PARAMETER (SISI A)</b>", cell_bold),
-                Paragraph("<b>ISIAN DATA</b>", cell_bold),
-                Paragraph("<b>FIELD / PARAMETER (SISI B)</b>", cell_bold),
+                Paragraph("<b>FIELD / PARAMETER</b>", cell_bold),
                 Paragraph("<b>ISIAN DATA</b>", cell_bold)
             ]
         ]
 
-        left_groups = groups[:3]
-        right_groups = groups[3:]
+        # Menyusun tabel tunggal penuh ke bawah untuk mode Portrait
+        for title, keys in groups:
+            table_rows.append([
+                Paragraph(f"<b>{title}</b>", sec_header),
+                Paragraph("", sec_header)
+            ])
+            for k in keys:
+                val_txt = str(current_data.get(k, "") or "")
+                table_rows.append([
+                    Paragraph(f"<b>{k}</b>", cell_bold),
+                    Paragraph(val_txt, cell_norm)
+                ])
 
-        def flatten_group(grp_list):
-            flat = []
-            for title, keys in grp_list:
-                flat.append(('HEADER', title))
-                for k in keys:
-                    flat.append(('DATA', k, current_data.get(k, "")))
-            return flat
-
-        left_flat = flatten_group(left_groups)
-        right_flat = flatten_group(right_groups)
-
-        max_rows = max(len(left_flat), len(right_flat))
-
-        for i in range(max_rows):
-            item_l = left_flat[i] if i < len(left_flat) else None
-            item_r = right_flat[i] if i < len(right_flat) else None
-
-            if item_l:
-                if item_l[0] == 'HEADER':
-                    c1 = Paragraph(f"<b>{item_l[1]}</b>", sec_header)
-                    c2 = Paragraph("", cell_norm)
-                else:
-                    c1 = Paragraph(f"<b>{item_l[1]}</b>", cell_bold)
-                    c2 = Paragraph(str(item_l[2] or ""), cell_norm)
-            else:
-                c1, c2 = Paragraph("", cell_norm), Paragraph("", cell_norm)
-
-            if item_r:
-                if item_r[0] == 'HEADER':
-                    c3 = Paragraph(f"<b>{item_r[1]}</b>", sec_header)
-                    c4 = Paragraph("", cell_norm)
-                else:
-                    c3 = Paragraph(f"<b>{item_r[1]}</b>", cell_bold)
-                    c4 = Paragraph(str(item_r[2] or ""), cell_norm)
-            else:
-                c3, c4 = Paragraph("", cell_norm), Paragraph("", cell_norm)
-
-            table_rows.append([c1, c2, c3, c4])
-
-        col_widths = [150, 303, 150, 303]
+        col_widths = [200, 372]
         
         pdf_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
         
@@ -436,35 +406,58 @@ with col_d2:
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 1.5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+            ('TOPPADDING', (0, 0), (-1, -1), 1.2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1.2),
             ('LEFTPADDING', (0, 0), (-1, -1), 4),
             ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor("#D1D5DB")),
         ]
 
+        # Mewarnai header grup
         r_idx = 1
-        for i in range(max_rows):
-            item_l = left_flat[i] if i < len(left_flat) else None
-            item_r = right_flat[i] if i < len(right_flat) else None
-
-            if item_l and item_l[0] == 'HEADER':
-                t_style.append(('BACKGROUND', (0, r_idx), (1, r_idx), colors.HexColor("#1E3A8A")))
-            if item_r and item_r[0] == 'HEADER':
-                t_style.append(('BACKGROUND', (2, r_idx), (3, r_idx), colors.HexColor("#1E3A8A")))
-
-            r_idx += 1
+        for title, keys in groups:
+            t_style.append(('BACKGROUND', (0, r_idx), (1, r_idx), colors.HexColor("#1E3A8A")))
+            r_idx += len(keys) + 1
 
         pdf_table.setStyle(TableStyle(t_style))
-        
         elements.append(pdf_table)
+        elements.append(Spacer(1, 10))
+
+        # BLOK TANDA TANGAN (Kasi Pelayanan & Kepala Desa Tambi)
+        tgl_surat_str = current_data.get("Tanggal Surat", format_tanggal_indonesia(date.today()))
+        
+        ttd_rows = [
+            [
+                Paragraph("Petugas Pengantar / Kasi Pelayanan", ttd_center),
+                Paragraph(f"Tambi, {tgl_surat_str}<br/>Mengetahui,<br/>Kepala Desa Tambi", ttd_center)
+            ],
+            [
+                Paragraph("<br/><br/><br/>", ttd_center),
+                Paragraph("<br/><br/><br/>", ttd_center)
+            ],
+            [
+                Paragraph("<u><b>Chalim Muchtarom, S.Pd.I</b></u>", ttd_bold_underline),
+                Paragraph("<u><b>J U R I</b></u>", ttd_bold_underline)
+            ]
+        ]
+        
+        ttd_table = Table(ttd_rows, colWidths=[286, 286])
+        ttd_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        
+        elements.append(ttd_table)
+
         doc.build(elements)
         buffer.seek(0)
         return buffer
 
     pdf_bytes = generate_pdf_formal(st.session_state.get('input_data'))
     st.download_button(
-        label="📄 Download Laporan PDF Ringkas Terkelompok (1 Lembar F4)",
+        label="📄 Download Laporan PDF Ringkas Terkelompok (1 Lembar F4 Portrait)",
         data=pdf_bytes,
         file_name="Ringkasan_Data_Catin_F4.pdf",
         mime="application/pdf",
